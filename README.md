@@ -13,8 +13,7 @@ Repo ildizida Mini App (`index.html`, `app.js`, `styles.css`) va Vercel serverle
 - **Telegramga saqlash** — faylni ochgan foydalanuvchi Telegram chatiga yuborish
 - UZ / RU / EN
 - Yozuv API: Telegram Mini App `initData` yoki `ADMIN_API_TOKEN`
-- **Rahbar paroli** (`LEADER_PASSWORD`) — Mini App + API + bot faqat paroldan keyin
-- Bot buyruqlari: `/list`, `/add`, `/docs`, `/app`, …
+- Bot: ochiq `/app` / `/help`; **admin** buyruqlar `ADMIN_TELEGRAM_IDS` bilan (`/admin`, `/list`, `/add`, …)
 - Fayllar: Vercel Blob (ixtiyoriy) yoki DB ichida (kichik fayllar)
 
 ## Environment variables (Vercel)
@@ -26,7 +25,6 @@ Vercel → Project → **Settings → Environment Variables** (Production + Prev
 | `TURSO_DATABASE_URL` | **Yes (prod)** | Turso libSQL URL, e.g. `libsql://…turso.io` |
 | `TURSO_AUTH_TOKEN` | **Yes (prod)** | Turso auth token |
 | `BOT_TOKEN` | Recommended | Same token as the Telegram bot — validates WebApp `initData` on writes **and** powers «Telegramga saqlash» (`sendDocument`) |
-| `LEADER_PASSWORD` | Recommended (prod) | Leader gate password (alias: `ACCESS_PASSWORD`). When set, Mini App / API / bot stay locked until this password is entered |
 | `ADMIN_API_TOKEN` | Optional | Shared secret for scripts/admin (`X-Admin-Token` header) |
 | `BLOB_READ_WRITE_TOKEN` | Optional | Vercel Blob token; if unset, files store as base64 in DB (~3.5MB limit) |
 
@@ -34,18 +32,20 @@ Do **not** invent or commit real secret values. Copy from Turso / BotFather / Ve
 
 Root `.env.example` lists the same keys for local use.
 
-### Leader link + password (Hasanboy uchun)
+### Admin Telegram IDs (bot)
 
-1. Vercel (va bot `bot/.env`) da `LEADER_PASSWORD=...` qoʻying (yoki `ACCESS_PASSWORD`). Haqiqiy sirni chatga yozmang / repoga commit qilmang.
-2. **Redeploy** Vercel; botni restart qiling (`LEADER_PASSWORD` bot `.env` da ham bir xil boʻlsin).
-3. Rahbarlarga **ikkita narsa** bering:
-   - **Link (Mini App):** `https://alcana-xodimlar.vercel.app` (BotFather menu button / bot `/app` ham shu)
-   - **Parol:** Vercel dagi `LEADER_PASSWORD` qiymati (ogʻzaki / xavfsiz kanal)
-4. Mini App ochilganda parol soʻraladi → toʻgʻri kiritsa session ichida saqlanadi.
-5. Botda: `/login <parol>` → keyin `/list`, `/add`, `/docs`, …
-6. Parolni almashtirish: Vercel env ni oʻzgartiring → Redeploy; bot `.env` ni yangilang → restart. Eski sessionlar ishlamay qoladi.
+Admin-only bot buyruqlari (`/admin`, `/list`, `/add`, `/docs`, `/delete`, `/photo`, `/upload`) faqat `ADMIN_TELEGRAM_IDS` dagi userlarga.
 
-Ixtiyoriy qisqa link: `https://alcana-xodimlar.vercel.app?access=PAROL` (parol URL da qolmasin — ilova uni olib tashlaydi; oddiy holatda alohida ulashing).
+1. Botda `/whoami` — o‘z Telegram **user ID** ni oling (raqam).
+2. `bot/.env` ga qo‘ying (placeholders):
+   ```env
+   ADMIN_TELEGRAM_IDS=123456789,987654321
+   ADMIN_API_TOKEN=same-as-vercel-admin-token
+   ```
+3. Botni restart qiling. Mini App **parolsiz** ochiladi (yozuvlar hali `BOT_TOKEN` initData / `ADMIN_API_TOKEN` bilan himoyalangan).
+4. Adminlar: `/admin` menyu. Boshqalar: faqat `/app`, `/help`, `/whoami`.
+
+`ADMIN_TELEGRAM_IDS` bo‘sh bo‘lsa — hech kim admin emas (xavfsiz default).
 
 ### Turso setup (free tier)
 
@@ -64,7 +64,6 @@ Legacy single-file rows migrate into `document_files` automatically.
 - If `BOT_TOKEN` is set, the API HMAC-validates initData.
 - Alternatively send `X-Admin-Token: <ADMIN_API_TOKEN>` (or `Authorization: Bearer …`).
 - If **neither** `BOT_TOKEN` nor `ADMIN_API_TOKEN` is set, writes are open (local/dev only — set at least one in production).
-- If `LEADER_PASSWORD` / `ACCESS_PASSWORD` is set, **all** staff/file APIs also require `X-Leader-Password` (or `?access=` for file open links).
 - «Telegramga saqlash» needs `BOT_TOKEN` **and** a real Mini App `initData` user (chat id).
 
 ## Vercel deploy
@@ -118,7 +117,7 @@ cp .env.example .env
 BOT_TOKEN=sizning_haqiqiy_bot_tokeningiz
 WEBAPP_URL=https://alcana-xodimlar.vercel.app
 API_BASE_URL=https://alcana-xodimlar.vercel.app
-LEADER_PASSWORD=change-me-leader-password
+ADMIN_TELEGRAM_IDS=123456789,987654321
 ADMIN_API_TOKEN=
 ```
 
@@ -126,21 +125,22 @@ ADMIN_API_TOKEN=
 npm start
 ```
 
-Production da `WEBAPP_URL` / `API_BASE_URL` ni Vercel URL bilan bir xil qoldiring. `LEADER_PASSWORD` Vercel dagi bilan bir xil boʻlsin.
+Production da `WEBAPP_URL` / `API_BASE_URL` ni Vercel URL bilan bir xil qoldiring. `ADMIN_API_TOKEN` Vercel dagi bilan bir xil boʻlsin (bot yozuvlari uchun).
 
 ### Bot buyruqlari
 
-| Command | Description |
-|---|---|
-| `/start` | Salomlash + Mini App tugma |
-| `/help` | Buyruqlar roʻyxati |
-| `/login <parol>` | Rahbar kirishi (`LEADER_PASSWORD`) |
-| `/logout` | Chiqish |
-| `/app` | Mini App |
-| `/list` (`/staff`) | Xodimlar + progress |
-| `/docs <ism>` | Xodim hujjatlari holati |
-| `/add <Ism Familiya>` | Yangi xodim |
-| `/photo` / `/upload` | Foto/hujjat yuklash → Mini App ga yoʻnaltiradi |
+| Command | Who | Description |
+|---|---|---|
+| `/start` | all | Salomlash + Mini App tugma |
+| `/help` | all | Buyruqlar |
+| `/app` | all | Mini App |
+| `/whoami` | all | Telegram user ID (admin roʻyxatiga qoʻshish) |
+| `/admin` | admin | Admin menyu |
+| `/list` (`/staff`) | admin | Xodimlar + progress |
+| `/docs <ism>` | admin | Hujjatlar holati |
+| `/add <Ism Familiya>` | admin | Yangi xodim |
+| `/delete <ism>` | admin | Xodim oʻchirish |
+| `/photo` / `/upload` | admin | Foto/hujjat → Mini App |
 
 ## BotFather
 
@@ -169,14 +169,12 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 | GET | `/api/files/:employeeId/:docId/:fileId` | no | Download specific file |
 | POST | `/api/telegram/send-document` | write + Telegram user | `{ employeeId, docId, fileId }` → bot `sendDocument` to chatting user |
 
-When `LEADER_PASSWORD` is set, staff/file/telegram routes also need `X-Leader-Password` (health stays public and returns `accessRequired: true`).
-
 ## Redeploy checklist (foydalanuvchi uchun)
 
 1. Turso URL + token ni Vercel Environment Variables ga qoʻying
 2. `BOT_TOKEN` (va ixtiyoriy `ADMIN_API_TOKEN`) ni qoʻying — «Telegramga saqlash» uchun `BOT_TOKEN` majburiy
-3. `LEADER_PASSWORD` qoʻying; xuddi shuni bot `.env` ga ham yozing
-4. Vercel da **Redeploy**; botni restart qiling
-5. `/api/health` ni tekshiring (`accessRequired: true` boʻlishi kerak)
-6. Bot `WEBAPP_URL` = `https://alcana-xodimlar.vercel.app`
-7. Rahbarga **link + parol** bering; Mini App / `/login` ni sinab koʻring
+3. Vercel da **Redeploy**
+4. `/api/health` ni tekshiring
+5. Bot `WEBAPP_URL` = `https://alcana-xodimlar.vercel.app`
+6. Bot `.env`: `ADMIN_TELEGRAM_IDS` ( `/whoami` dan) + `ADMIN_API_TOKEN` → bot restart
+7. Telegramda Mini App oching — status **Backend ulangan**; admin `/admin` ni sinab koʻring

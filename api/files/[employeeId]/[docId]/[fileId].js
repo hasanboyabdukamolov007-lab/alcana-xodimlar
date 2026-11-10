@@ -1,6 +1,5 @@
 const { ensureSchema, getDocumentFileById } = require('../../../_lib/db');
 const { isValidDocId } = require('../../../_lib/docs');
-const { leaderAccessDenial } = require('../../../_lib/access');
 const { setCors, handleOptions, sendJson } = require('../../../_lib/http');
 
 module.exports = async function handler(req, res) {
@@ -14,8 +13,6 @@ module.exports = async function handler(req, res) {
   if (!isValidDocId(docId)) return sendJson(res, 400, { error: 'Invalid document id' });
 
   try {
-    const denied = leaderAccessDenial(req);
-    if (denied) return sendJson(res, denied.status, denied.body);
     await ensureSchema();
     const doc = await getDocumentFileById(employeeId, docId, fileId);
     if (!doc || (!doc.file_url && !doc.file_data)) {

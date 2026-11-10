@@ -1,5 +1,5 @@
 // Alcana Xodimlar Hujjatlari Telegram Bot
-// Commands mirror Mini App actions; leader password gates access when configured.
+// Public: open Mini App. Admin-only actions gated by ADMIN_TELEGRAM_IDS.
 
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
@@ -7,10 +7,21 @@ const { Telegraf, Markup } = require('telegraf');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://alcana-xodimlar.vercel.app';
 const API_BASE = (process.env.API_BASE_URL || WEBAPP_URL).replace(/\/$/, '');
-const LEADER_PASSWORD = String(
-  process.env.LEADER_PASSWORD || process.env.ACCESS_PASSWORD || ''
-).trim();
 const ADMIN_API_TOKEN = String(process.env.ADMIN_API_TOKEN || '').trim();
+
+/** Comma/space-separated Telegram user IDs allowed to run admin commands. */
+function parseAdminIds(raw) {
+  return new Set(
+    String(raw || '')
+      .split(/[\s,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+}
+
+const ADMIN_TELEGRAM_IDS = parseAdminIds(
+  process.env.ADMIN_TELEGRAM_IDS || process.env.ADMIN_TG_IDS || ''
+);
 
 if (!BOT_TOKEN) {
   console.error("Xato: .env faylida BOT_TOKEN ni qo'ying!");
@@ -19,42 +30,40 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-/** @type {Set<string>} */
-const unlockedChats = new Set();
-/** @type {Map<string, { step: string, draft?: object }>} */
+/** @type {Map<string, { step: string }>} */
 const conversations = new Map();
 
 function chatKey(ctx) {
   return String(ctx.chat?.id || ctx.from?.id || '');
 }
 
-function accessEnabled() {
-  return Boolean(LEADER_PASSWORD);
+function isAdmin(ctx) {
+  const uid = ctx.from?.id != null ? String(ctx.from.id) : '';
+  if (!uid) return false;
+  if (!ADMIN_TELEGRAM_IDS.size) {
+    // No admins configured → treat nobody as admin (safer than open).
+    return false;
+  }
+  return ADMIN_TELEGRAM_IDS.has(uid);
 }
 
-function isUnlocked(ctx) {
-  if (!accessEnabled()) return true;
-  return unlockedChats.has(chatKey(ctx));
-}
-
-function lockMessage() {
+function adminDeniedMessage() {
   return (
-    "🔒 Rahbar paroli talab qilinadi.\n\n" +
-    "Kirish: `/login SIZNING_PAROLINGIZ`\n" +
-    "Yoki Mini App: ochib parolni kiriting.\n\n" +
-    "Parolni Hasanboy Vercel / bot `.env` dagi `LEADER_PASSWORD` orqali beradi."
+    '⛔ Bu buyruq faqat adminlar uchun.\n\n' +
+    'Adminlar `ADMIN_TELEGRAM_IDS` (bot `.env`) dagi Telegram user ID lar.\n' +
+    'O‘z ID: /whoami\n' +
+    'Oddiy foydalanuvchilar: /app orqali Mini App.'
   );
 }
 
-async function requireUnlock(ctx, next) {
-  if (isUnlocked(ctx)) return next();
-  await ctx.reply(lockMessage(), { parse_mode: 'Markdown' });
+async function requireAdmin(ctx, next) {
+  if (isAdmin(ctx)) return next();
+  await ctx.reply(adminDeniedMessage());
 }
 
 async function api(method, path, body) {
   const headers = { Accept: 'application/json' };
   if (body) headers['Content-Type'] = 'application/json';
-  if (LEADER_PASSWORD) headers['X-Leader-Password'] = LEADER_PASSWORD;
   if (ADMIN_API_TOKEN) headers['X-Admin-Token'] = ADMIN_API_TOKEN;
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -82,101 +91,126 @@ function progressLine(emp) {
   const docs = emp.documents || {};
   const ids = Object.keys(docs);
   const total = ids.length || 1;
-  const done = ids.filter((id) => docs[id]?.present || docs[id]?.hasFile || (docs[id]?.files || []).length).length;
+  const done = ids.filter(
+    (id) => docs[id]?.present || docs[id]?.hasFile || (docs[id]?.files || []).length
+  ).length;
   return `${done}/${total}`;
 }
 
-function helpText() {
-  return [
-    '📋 *Alcana Xodimlar* — bot buyruqlari',
-    '',
-    accessEnabled() ? '🔐 `/login <parol>` — kirish' : '🔐 Parol o‘chiq (dev)',
-    '🚪 `/logout` — chiqish',
-    '📄 `/app` — Mini App ochish',
-    '👥 `/list` yoki `/staff` — xodimlar ro‘yxati',
-    '🔎 `/docs <ism>` — xodim hujjatlari',
-    '➕ `/add <Ism Familiya>` — xodim qo‘shish',
-    '📷 `/photo` — foto yuklash (Mini App orqali)',
-    '📎 `/upload` — hujjat yuklash (Mini App orqali)',
-    '❓ `/help` — shu yordam',
-    '',
-    `Mini App: ${WEBAPP_URL}`,
-  ].join('\n');
+function escapeMd(s) {
+  return String(s || '').replace(/([_*`\[\]])/g, '\\$1');
 }
 
 function webAppKeyboard() {
   return Markup.keyboard([[Markup.button.webApp('📄 Alcana Xodimlar', WEBAPP_URL)]]).resize();
 }
 
+function helpText(ctx) {
+  const lines = [
+    '📋 *Alcana Xodimlar* — bot buyruqlari',
+    '',
+    '🌐 `/app` — Mini App ochish',
+    '🆔 `/whoami` — Telegram user ID (admin ro‘yxatiga qo‘shish uchun)',
+    '❓ `/help` — shu yordam',
+  ];
+  if (isAdmin(ctx)) {
+    lines.push(
+      '',
+      '*Admin* (`ADMIN_TELEGRAM_IDS`):',
+      '🛠 `/admin` — admin menyu',
+      '👥 `/list` — xodimlar',
+      '🔎 `/docs <ism>` — hujjatlar holati',
+      '➕ `/add <Ism Familiya>` — xodim qo‘shish',
+      '🗑 `/delete <ism>` — xodim o‘chirish',
+      '📷 `/photo` / `/upload` — Mini App orqali yuklash'
+    );
+  } else {
+    lines.push('', 'Admin buyruqlari faqat `ADMIN_TELEGRAM_IDS` dagi userlarga.');
+  }
+  lines.push('', `Mini App: ${WEBAPP_URL}`);
+  return lines.join('\n');
+}
+
 bot.start(async (ctx) => {
-  const unlocked = isUnlocked(ctx);
   await ctx.reply(
-    unlocked
-      ? "👋 Alcana Xodimlar Hujjatlari.\n\nBuyruqlar: /help\nMini App tugmasi pastda."
-      : "👋 Alcana Xodimlar Hujjatlari.\n\n" + lockMessage(),
+    '👋 Alcana Xodimlar Hujjatlari.\n\nMini App tugmasi pastda. Buyruqlar: /help' +
+      (isAdmin(ctx) ? '\nSiz adminsiz — /admin' : ''),
+    webAppKeyboard()
+  );
+});
+
+bot.command('help', (ctx) => ctx.reply(helpText(ctx), { parse_mode: 'Markdown' }));
+
+bot.command('whoami', async (ctx) => {
+  const id = ctx.from?.id;
+  const name = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ');
+  await ctx.reply(
+    `Sizning Telegram user ID: \`${id}\`\nIsm: ${name || '—'}\nAdmin: ${isAdmin(ctx) ? 'ha' : 'yo‘q'}\n\n` +
+      'Hasanboy bot `.env` ga qo‘shadi:\n`ADMIN_TELEGRAM_IDS=123456789,987654321`',
+    { parse_mode: 'Markdown' }
+  );
+});
+
+bot.command('app', async (ctx) => {
+  await ctx.reply(
+    'Alcana Xodimlar Mini App:',
+    Markup.inlineKeyboard([Markup.button.webApp('📄 Xodimlar hujjatlari', WEBAPP_URL)])
+  );
+});
+
+bot.command('admin', requireAdmin, async (ctx) => {
+  await ctx.reply(
+    '🛠 *Admin menyu*\n\n' +
+      '`/list` — xodimlar\n' +
+      '`/docs <ism>` — hujjatlar\n' +
+      '`/add <Ism Familiya>` — qo‘shish\n' +
+      '`/delete <ism>` — o‘chirish\n' +
+      '`/photo` / `/upload` — fayl/foto (Mini App)\n' +
+      '`/app` — Mini App',
     {
-      parse_mode: unlocked ? undefined : 'Markdown',
-      ...webAppKeyboard(),
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.webApp('📄 Mini App', WEBAPP_URL)],
+        [Markup.button.callback('👥 Ro‘yxat', 'admin:list')],
+      ]),
     }
   );
 });
 
-bot.command('help', (ctx) => ctx.reply(helpText(), { parse_mode: 'Markdown' }));
-
-bot.command(['login', 'auth', 'password'], async (ctx) => {
-  if (!accessEnabled()) {
-    unlockedChats.add(chatKey(ctx));
-    return ctx.reply('Parol sozlanmagan — kirish ochiq (dev). /help');
+async function replyStaffList(ctx) {
+  const data = await api('GET', '/api/employees');
+  const employees = data.employees || [];
+  if (!employees.length) {
+    return ctx.reply('Xodimlar yo‘q. Qo‘shish: `/add Ism Familiya`', { parse_mode: 'Markdown' });
   }
-  const text = ctx.message?.text || '';
-  const parts = text.trim().split(/\s+/);
-  const pwd = parts.slice(1).join(' ').trim();
-  if (!pwd) {
-    return ctx.reply('Ishlatish: `/login SIZNING_PAROLINGIZ`', { parse_mode: 'Markdown' });
-  }
-  if (pwd !== LEADER_PASSWORD) {
-    unlockedChats.delete(chatKey(ctx));
-    return ctx.reply('❌ Parol noto‘g‘ri.');
-  }
-  unlockedChats.add(chatKey(ctx));
-  return ctx.reply('✅ Kirish muvaffaqiyatli. Endi /list, /add, /docs ishlaydi.\n/help');
-});
-
-bot.command('logout', async (ctx) => {
-  unlockedChats.delete(chatKey(ctx));
-  conversations.delete(chatKey(ctx));
-  await ctx.reply(accessEnabled() ? '🚪 Chiqdingiz. Qayta `/login` qiling.' : 'Chiqildi.', {
+  const lines = employees.slice(0, 40).map((e, i) => {
+    const pos = e.position?.uz || e.position?.ru || e.position?.en || '';
+    return `${i + 1}. *${escapeMd(e.name)}* — ${progressLine(e)} ${pos ? `(${escapeMd(pos)})` : ''}`;
+  });
+  if (employees.length > 40) lines.push(`… +${employees.length - 40} ta`);
+  await ctx.reply(`👥 Xodimlar (${employees.length}):\n\n${lines.join('\n')}`, {
     parse_mode: 'Markdown',
   });
-});
+}
 
-bot.command('app', requireUnlock, async (ctx) => {
-  await ctx.reply('Alcana Xodimlar Mini App:', Markup.inlineKeyboard([
-    Markup.button.webApp('📄 Xodimlar hujjatlari', WEBAPP_URL),
-  ]));
-});
-
-bot.command(['list', 'staff'], requireUnlock, async (ctx) => {
+bot.command(['list', 'staff'], requireAdmin, async (ctx) => {
   try {
-    const data = await api('GET', '/api/employees');
-    const employees = data.employees || [];
-    if (!employees.length) {
-      return ctx.reply('Xodimlar yo‘q. Qo‘shish: `/add Ism Familiya`', { parse_mode: 'Markdown' });
-    }
-    const lines = employees.slice(0, 40).map((e, i) => {
-      const pos = e.position?.uz || e.position?.ru || e.position?.en || '';
-      return `${i + 1}. *${escapeMd(e.name)}* — ${progressLine(e)} ${pos ? `(${escapeMd(pos)})` : ''}`;
-    });
-    if (employees.length > 40) lines.push(`… +${employees.length - 40} ta`);
-    await ctx.reply(`👥 Xodimlar (${employees.length}):\n\n${lines.join('\n')}`, {
-      parse_mode: 'Markdown',
-    });
+    await replyStaffList(ctx);
   } catch (err) {
     await ctx.reply(`Xato: ${err.message}`);
   }
 });
 
-bot.command(['docs', 'employee', 'get'], requireUnlock, async (ctx) => {
+bot.action('admin:list', requireAdmin, async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    await replyStaffList(ctx);
+  } catch (err) {
+    await ctx.reply(`Xato: ${err.message}`);
+  }
+});
+
+bot.command(['docs', 'employee', 'get'], requireAdmin, async (ctx) => {
   const query = (ctx.message?.text || '').replace(/^\/\S+\s*/, '').trim();
   if (!query) {
     return ctx.reply('Ishlatish: `/docs Karimov`', { parse_mode: 'Markdown' });
@@ -206,19 +240,21 @@ bot.command(['docs', 'employee', 'get'], requireUnlock, async (ctx) => {
   }
 });
 
-bot.command('add', requireUnlock, async (ctx) => {
+bot.command('add', requireAdmin, async (ctx) => {
+  if (!ADMIN_API_TOKEN) {
+    return ctx.reply(
+      'ADMIN_API_TOKEN bot `.env` da yo‘q — yozuv API ishlamaydi. Vercel dagi `ADMIN_API_TOKEN` bilan bir xil qiymat qo‘ying.'
+    );
+  }
   const name = (ctx.message?.text || '').replace(/^\/add\s*/i, '').trim();
   if (!name) {
     conversations.set(chatKey(ctx), { step: 'await_name' });
     return ctx.reply('Yangi xodim ismini yuboring (yoki `/add Ism Familiya`):');
   }
   try {
-    const data = await api('POST', '/api/employees', {
-      name,
-      position: {},
-    });
+    const data = await api('POST', '/api/employees', { name, position: {} });
     await ctx.reply(
-      `✅ Qo‘shildi: *${escapeMd(data.employee?.name || name)}*\nHujjat/foto yuklash: /app`,
+      `✅ Qo‘shildi: *${escapeMd(data.employee?.name || name)}*\nHujjat/foto: /app`,
       { parse_mode: 'Markdown' }
     );
   } catch (err) {
@@ -226,20 +262,47 @@ bot.command('add', requireUnlock, async (ctx) => {
   }
 });
 
-bot.command(['photo', 'upload'], requireUnlock, async (ctx) => {
+bot.command(['delete', 'remove'], requireAdmin, async (ctx) => {
+  if (!ADMIN_API_TOKEN) {
+    return ctx.reply('ADMIN_API_TOKEN kerak (bot `.env` = Vercel).');
+  }
+  const query = (ctx.message?.text || '').replace(/^\/\S+\s*/, '').trim();
+  if (!query) {
+    return ctx.reply('Ishlatish: `/delete Karimov`', { parse_mode: 'Markdown' });
+  }
+  try {
+    const data = await api('GET', '/api/employees');
+    const q = query.toLowerCase();
+    const matches = (data.employees || []).filter((e) => String(e.name).toLowerCase().includes(q));
+    if (!matches.length) return ctx.reply('Topilmadi.');
+    if (matches.length > 1) {
+      const names = matches.slice(0, 8).map((e) => `• ${e.name}`).join('\n');
+      return ctx.reply(`Bir nechta topildi — aniqroq yozing:\n${names}`);
+    }
+    const emp = matches[0];
+    await api('DELETE', `/api/employees/${emp.id}`);
+    await ctx.reply(`🗑 O‘chirildi: ${emp.name}`);
+  } catch (err) {
+    await ctx.reply(`Xato: ${err.message}`);
+  }
+});
+
+bot.command(['photo', 'upload'], requireAdmin, async (ctx) => {
   await ctx.reply(
-    '📷/📎 Foto va hujjat yuklash Mini App orqali amalga oshiriladi (Telegram WebView + fayl picker).\n\n' +
-      '1) /app tugmasini bosing\n' +
-      '2) Xodimni oching → Yuklash / Rasm tanlash\n' +
-      '3) Kerak bo‘lsa «Telegramga saqlash»',
+    '📷/📎 Foto va hujjat yuklash Mini App orqali.\n\n' +
+      '1) /app\n2) Xodim → Yuklash / Rasm tanlash\n3) Kerak bo‘lsa «Telegramga saqlash»',
     Markup.inlineKeyboard([Markup.button.webApp('📄 Mini App', WEBAPP_URL)])
   );
 });
 
-bot.on('text', requireUnlock, async (ctx, next) => {
+bot.on('text', async (ctx, next) => {
   const key = chatKey(ctx);
   const state = conversations.get(key);
   if (!state) return next();
+  if (!isAdmin(ctx)) {
+    conversations.delete(key);
+    return ctx.reply(adminDeniedMessage());
+  }
   if (state.step === 'await_name') {
     const name = String(ctx.message.text || '').trim();
     conversations.delete(key);
@@ -247,6 +310,9 @@ bot.on('text', requireUnlock, async (ctx, next) => {
       return ctx.reply('Bekor. Qayta: `/add Ism Familiya`', { parse_mode: 'Markdown' });
     }
     try {
+      if (!ADMIN_API_TOKEN) {
+        return ctx.reply('ADMIN_API_TOKEN kerak.');
+      }
       const data = await api('POST', '/api/employees', { name, position: {} });
       return ctx.reply(
         `✅ Qo‘shildi: *${escapeMd(data.employee?.name || name)}*\nDavomi: /app`,
@@ -259,15 +325,15 @@ bot.on('text', requireUnlock, async (ctx, next) => {
   return next();
 });
 
-function escapeMd(s) {
-  return String(s || '').replace(/([_*`\[\]])/g, '\\$1');
-}
-
 bot.launch().then(() => {
   console.log('✅ Alcana Xodimlar bot ishga tushdi');
   console.log(`Mini App: ${WEBAPP_URL}`);
   console.log(`API: ${API_BASE}`);
-  console.log(`Leader password gate: ${accessEnabled() ? 'ON' : 'OFF'}`);
+  console.log(
+    `Admins (ADMIN_TELEGRAM_IDS): ${
+      ADMIN_TELEGRAM_IDS.size ? [...ADMIN_TELEGRAM_IDS].join(', ') : '(none configured)'
+    }`
+  );
 });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));

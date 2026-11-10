@@ -5,7 +5,6 @@ const {
 } = require('../../../_lib/db');
 const { isValidDocId } = require('../../../_lib/docs');
 const { requireWriteAuth } = require('../../../_lib/auth');
-const { leaderAccessDenial } = require('../../../_lib/access');
 const { readJson, sendJson, handleOptions } = require('../../../_lib/http');
 const { storeFile } = require('../../../_lib/store');
 
@@ -18,8 +17,6 @@ module.exports = async function handler(req, res) {
   if (!isValidDocId(docId)) return sendJson(res, 400, { error: 'Invalid document id' });
 
   try {
-    const denied = leaderAccessDenial(req);
-    if (denied) return sendJson(res, denied.status, denied.body);
 
     await ensureSchema();
 

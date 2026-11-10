@@ -4,16 +4,12 @@ const {
   createEmployee,
 } = require('../_lib/db');
 const { requireWriteAuth } = require('../_lib/auth');
-const { leaderAccessDenial } = require('../_lib/access');
 const { readJson, sendJson, handleOptions } = require('../_lib/http');
 
 module.exports = async function handler(req, res) {
   if (handleOptions(req, res)) return;
 
   try {
-    const denied = leaderAccessDenial(req);
-    if (denied) return sendJson(res, denied.status, denied.body);
-
     await ensureSchema();
 
     if (req.method === 'GET') {

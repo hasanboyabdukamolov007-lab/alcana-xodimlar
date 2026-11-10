@@ -1,7 +1,6 @@
 const { ensureSchema, getDocumentFileById } = require('../_lib/db');
 const { isValidDocId } = require('../_lib/docs');
 const { requireWriteAuth, authMode } = require('../_lib/auth');
-const { leaderAccessDenial } = require('../_lib/access');
 const { readJson, sendJson, handleOptions } = require('../_lib/http');
 
 /**
@@ -13,8 +12,6 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
 
   try {
-    const denied = leaderAccessDenial(req);
-    if (denied) return sendJson(res, denied.status, denied.body);
 
     const auth = requireWriteAuth(req);
     if (!auth.ok) return sendJson(res, auth.status || 401, { error: auth.error });

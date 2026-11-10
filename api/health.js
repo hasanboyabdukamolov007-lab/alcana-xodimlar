@@ -1,6 +1,5 @@
 const { ensureSchema, backendConfigured, getDbUrl } = require('./_lib/db');
 const { authMode } = require('./_lib/auth');
-const { accessConfigured } = require('./_lib/access');
 const { sendJson, handleOptions } = require('./_lib/http');
 
 module.exports = async function handler(req, res) {
@@ -12,7 +11,6 @@ module.exports = async function handler(req, res) {
   try {
     await ensureSchema();
     const auth = authMode();
-    const url = getDbUrl();
     const usingTurso = Boolean(process.env.TURSO_DATABASE_URL);
     return sendJson(res, 200, {
       ok: true,
@@ -21,11 +19,9 @@ module.exports = async function handler(req, res) {
       databaseConfigured: backendConfigured(),
       blobConfigured: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
       authRequired: auth.requireAuth,
-      accessRequired: accessConfigured(),
       authModes: {
         telegramInitData: Boolean(auth.botToken),
         adminToken: Boolean(auth.adminToken),
-        leaderPassword: accessConfigured(),
       },
       // never expose secrets or full local paths in production
       dbHint: usingTurso ? 'turso' : 'file',

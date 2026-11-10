@@ -5,7 +5,6 @@ const {
   deleteEmployee,
 } = require('../_lib/db');
 const { requireWriteAuth } = require('../_lib/auth');
-const { leaderAccessDenial } = require('../_lib/access');
 const { readJson, sendJson, handleOptions } = require('../_lib/http');
 
 module.exports = async function handler(req, res) {
@@ -15,8 +14,6 @@ module.exports = async function handler(req, res) {
   if (!id) return sendJson(res, 400, { error: 'Missing employee id' });
 
   try {
-    const denied = leaderAccessDenial(req);
-    if (denied) return sendJson(res, denied.status, denied.body);
 
     await ensureSchema();
 

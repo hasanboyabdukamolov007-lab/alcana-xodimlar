@@ -187,12 +187,6 @@ async function main() {
   assert(deleted.status === 200 && deleted.data.ok, 'delete failed');
   console.log('✓ delete employee');
 
-  assert(
-    health.data.accessRequired === false || health.data.accessRequired === true,
-    'health.accessRequired missing'
-  );
-  console.log('✓ health.accessRequired =', health.data.accessRequired);
-
   console.log('\nAll API smoke tests passed.');
 }
 
