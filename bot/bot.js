@@ -5,7 +5,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const WEBAPP_URL = process.env.WEBAPP_URL || 'https://alcana-xodimlar.sslip.io';
+const WEBAPP_URL = process.env.WEBAPP_URL || 'https://alcana-xodimlar.vercel.app';
 
 if (!BOT_TOKEN) {
   console.error('Xato: .env faylida BOT_TOKEN ni qo\'ying!');
