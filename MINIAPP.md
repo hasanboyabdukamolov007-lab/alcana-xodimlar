@@ -23,7 +23,7 @@ Backend: Vercel serverless API + Turso (SQLite) — qarang `README.md`.
 - Qidiruv (search)
 - Progress bar + Complete / Incomplete holati
 - Har bir hujjat uchun tick + fayl yuklash (API orqali saqlanadi)
-- Yangi xodim qo‘shish / tahrirlash (backend ulanganida)
+- Yangi xodim qo‘shish / tahrirlash (backend ulanganida); profil fotosi fayl yuklash (kamera/galereya)
 - Telegram theme, haptic feedback, initData auth
 
 ## Qanday ishga tushirish

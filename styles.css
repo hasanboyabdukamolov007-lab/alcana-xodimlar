@@ -131,3 +131,42 @@ h1 { font-size: 1.35rem; font-weight: 700; }
   color: var(--tg-theme-text-color);
 }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.photo-field { margin-top: 4px; }
+.photo-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.photo-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #ddd;
+  flex-shrink: 0;
+}
+.photo-preview-empty {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--tg-theme-secondary-bg-color);
+  border: 2px dashed var(--tg-theme-hint-color);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.photo-picker-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 140px;
+}
+.photo-pick-btn {
+  display: inline-block;
+  text-align: center;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+#btn-clear-photo { margin-bottom: 0; }

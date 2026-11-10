@@ -124,7 +124,15 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 | DELETE | `/api/employees/:id` | write | Delete employee |
 | PATCH | `/api/employees/:id/docs/:docId` | write | `{ "present": true/false }` |
 | POST | `/api/employees/:id/docs/:docId` | write | Upload `{ filename, mimeType, data(base64) }` |
+| POST | `/api/employees/:id/photo` | write | Upload profile photo `{ filename, mimeType, data(base64) }` |
+| GET | `/api/employees/:id/photo` | no | Serve profile photo (or redirect to Blob URL) |
+| DELETE | `/api/employees/:id/photo` | write | Clear profile photo |
 | GET | `/api/files/:employeeId/:docId` | no | Download / redirect to blob |
+
+## Profile photo (Mini App)
+
+Add/Edit employee form uses device file picker (camera/gallery), not a Photo URL field.
+Upload goes to `POST /api/employees/:id/photo` — Vercel Blob if `BLOB_READ_WRITE_TOKEN` is set, otherwise base64 in DB and served from that GET path. **No new env vars** beyond the existing optional Blob token.
 
 ## Redeploy checklist (foydalanuvchi uchun)
 
@@ -134,3 +142,4 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 4. `/api/health` ni tekshiring
 5. Bot `WEBAPP_URL` = `https://alcana-xodimlar.vercel.app`
 6. Telegramda Mini App oching — status **Backend ulangan**, MainButton forma ochadi
+7. Edit/Add formada **Rasm tanlash** → preview → Saqlash; avatar yangilanadi

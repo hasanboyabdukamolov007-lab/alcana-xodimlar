@@ -6,36 +6,7 @@ const {
 const { isValidDocId } = require('../../../_lib/docs');
 const { requireWriteAuth } = require('../../../_lib/auth');
 const { readJson, sendJson, handleOptions } = require('../../../_lib/http');
-
-const MAX_INLINE_BYTES = 3.5 * 1024 * 1024; // under Vercel hobby body limit
-
-async function storeFile({ filename, mimeType, base64 }) {
-  const buffer = Buffer.from(base64, 'base64');
-  if (!buffer.length) throw Object.assign(new Error('Empty file'), { statusCode: 400 });
-  if (buffer.length > MAX_INLINE_BYTES) {
-    throw Object.assign(
-      new Error(`File too large (max ~${Math.floor(MAX_INLINE_BYTES / (1024 * 1024))}MB on this plan)`),
-      { statusCode: 413 }
-    );
-  }
-
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = require('@vercel/blob');
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const blob = await put(`staff-docs/${Date.now()}-${safeName}`, buffer, {
-      access: 'public',
-      contentType: mimeType || 'application/octet-stream',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-    return { fileUrl: blob.url, fileData: null, mimeType: mimeType || blob.contentType };
-  }
-
-  return {
-    fileUrl: null,
-    fileData: base64,
-    mimeType: mimeType || 'application/octet-stream',
-  };
-}
+const { storeFile } = require('../../../_lib/store');
 
 module.exports = async function handler(req, res) {
   if (handleOptions(req, res)) return;
