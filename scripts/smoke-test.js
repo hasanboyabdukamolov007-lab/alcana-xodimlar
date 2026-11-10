@@ -49,9 +49,16 @@ async function main() {
   assert(list.status === 200 && list.data.employees.some((e) => e.id === id), 'list missing employee');
   console.log('✓ list employees', list.data.employees.length);
 
-  const toggled = await req('PATCH', `/api/employees/${id}/docs/passport`, { present: true });
-  assert(toggled.status === 200 && toggled.data.employee.documents.passport.present, 'toggle failed');
-  console.log('✓ mark passport present');
+  const blocked = await req('PATCH', `/api/employees/${id}/docs/passport`, { present: true });
+  assert(
+    blocked.status === 400 && blocked.data.code === 'FILE_REQUIRED',
+    `expected FILE_REQUIRED without file: ${JSON.stringify(blocked)}`
+  );
+  assert(
+    !blocked.data.employee?.documents?.passport?.present,
+    'passport must stay incomplete without a file'
+  );
+  console.log('✓ reject present without file');
 
   const sample = Buffer.from('smoke-pdf-content').toString('base64');
   const uploaded = await req('POST', `/api/employees/${id}/docs/contract`, {
@@ -62,10 +69,18 @@ async function main() {
   assert(
     uploaded.status === 200 &&
       uploaded.data.employee.documents.contract.present &&
+      uploaded.data.employee.documents.contract.hasFile &&
       uploaded.data.employee.documents.contract.filename === 'contract-smoke.pdf',
     `upload failed: ${JSON.stringify(uploaded)}`
   );
-  console.log('✓ upload contract');
+  console.log('✓ upload contract (auto-complete)');
+
+  const retoggle = await req('PATCH', `/api/employees/${id}/docs/contract`, { present: true });
+  assert(
+    retoggle.status === 200 && retoggle.data.employee.documents.contract.present,
+    `re-confirm with file failed: ${JSON.stringify(retoggle)}`
+  );
+  console.log('✓ mark present allowed after upload');
 
   const file = await fetch(`${BASE}/api/files/${id}/contract`);
   assert(file.status === 200, `file download status ${file.status}`);

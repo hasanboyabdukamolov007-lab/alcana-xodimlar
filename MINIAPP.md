@@ -21,8 +21,10 @@ Backend: Vercel serverless API + Turso (SQLite) — qarang `README.md`.
 
 - To‘liq 3 tilda ishlaydi (UZ / RU / EN)
 - Qidiruv (search)
-- Progress bar + Complete / Incomplete holati
-- Har bir hujjat uchun tick + fayl yuklash (API orqali saqlanadi)
+- Progress bar + Complete / Incomplete holati (faqat yuklangan fayllar hisoblanadi)
+- Har bir hujjat uchun tick + fayl yuklash; faylsiz tick ogohlantirish beradi (UZ/RU/EN)
+- Yuklash muvaffaqiyatli bo‘lgach hujjat avtomatik tasdiqlanadi
+- Foto yo‘q bo‘lsa stock rasm emas — ism bosh harflari (initials)
 - Yangi xodim qo‘shish / tahrirlash (backend ulanganida)
 - Telegram theme, haptic feedback, initData auth
 

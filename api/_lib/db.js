@@ -54,19 +54,25 @@ async function ensureSchema() {
   return db;
 }
 
+function documentHasFile(d) {
+  return Boolean(d && (d.file_url || d.file_data));
+}
+
 function rowToEmployee(row, docsRows) {
   const documents = {};
   for (const id of DOC_IDS) {
     documents[id] = { present: false };
   }
   for (const d of docsRows || []) {
+    // Confirmed/complete only when a file is stored — ignore empty present flags.
+    const hasFile = documentHasFile(d);
     documents[d.doc_id] = {
-      present: Boolean(d.present),
-      filename: d.filename || undefined,
-      date: d.date || undefined,
-      url: d.file_url || undefined,
-      mimeType: d.mime_type || undefined,
-      hasFile: Boolean(d.file_url || d.file_data),
+      present: hasFile,
+      filename: hasFile ? d.filename || undefined : undefined,
+      date: hasFile ? d.date || undefined : undefined,
+      url: hasFile ? d.file_url || undefined : undefined,
+      mimeType: hasFile ? d.mime_type || undefined : undefined,
+      hasFile,
     };
   }
   return {
@@ -198,6 +204,13 @@ async function setDocumentPresent(employeeId, docId, present) {
       args: [employeeId, docId],
     });
   } else {
+    const existing = await getDocumentFile(employeeId, docId);
+    if (!documentHasFile(existing)) {
+      const err = new Error('File required before marking document present');
+      err.statusCode = 400;
+      err.code = 'FILE_REQUIRED';
+      throw err;
+    }
     await db.execute({
       sql: `INSERT INTO documents (employee_id, doc_id, present, date)
             VALUES (?, ?, 1, ?)
