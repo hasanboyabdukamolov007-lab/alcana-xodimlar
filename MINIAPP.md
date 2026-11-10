@@ -34,6 +34,7 @@ Olib tashlangan: Sudlanmaganligi haqida ma'lumotnoma (`no_criminal`).
 - Xodim fotosi: qurilmadan yuklash (URL emas); yo‘q bo‘lsa initials
 - Yangi xodim qo‘shish / tahrirlash (backend ulanganida)
 - Telegram theme, haptic feedback, initData auth
+- Bot admin buyruqlari: `ADMIN_TELEGRAM_IDS` (qarang `README.md`)
 
 ## Qanday ishga tushirish
 

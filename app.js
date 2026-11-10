@@ -164,6 +164,7 @@ let pendingPhotoFile = null;
 let photoCleared = false;
 let photoObjectUrl = null;
 
+
 const DEMO_STAFF = [
   {
     id: "demo-1",
@@ -297,6 +298,7 @@ function setLang(lang) {
   }
 }
 
+
 function updatePhotoPickLabel() {
   const btn = document.getElementById("btn-pick-photo");
   const preview = document.getElementById("photo-preview");
@@ -346,6 +348,7 @@ function employeePhotoSrc(emp) {
   }
   return src;
 }
+
 
 document.querySelectorAll(".lang-btn").forEach(btn => {
   btn.onclick = () => setLang(btn.dataset.lang);

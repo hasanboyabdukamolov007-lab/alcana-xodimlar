@@ -13,6 +13,7 @@ Repo ildizida Mini App (`index.html`, `app.js`, `styles.css`) va Vercel serverle
 - **Telegramga saqlash** — faylni ochgan foydalanuvchi Telegram chatiga yuborish
 - UZ / RU / EN
 - Yozuv API: Telegram Mini App `initData` yoki `ADMIN_API_TOKEN`
+- Bot: ochiq `/app` / `/help`; **admin** buyruqlar `ADMIN_TELEGRAM_IDS` bilan (`/admin`, `/list`, `/add`, …)
 - Fayllar: Vercel Blob (ixtiyoriy) yoki DB ichida (kichik fayllar)
 
 ## Environment variables (Vercel)
@@ -30,6 +31,21 @@ Vercel → Project → **Settings → Environment Variables** (Production + Prev
 Do **not** invent or commit real secret values. Copy from Turso / BotFather / Vercel Blob UI.
 
 Root `.env.example` lists the same keys for local use.
+
+### Admin Telegram IDs (bot)
+
+Admin-only bot buyruqlari (`/admin`, `/list`, `/add`, `/docs`, `/delete`, `/photo`, `/upload`) faqat `ADMIN_TELEGRAM_IDS` dagi userlarga.
+
+1. Botda `/whoami` — o‘z Telegram **user ID** ni oling (raqam).
+2. `bot/.env` ga qo‘ying (placeholders):
+   ```env
+   ADMIN_TELEGRAM_IDS=123456789,987654321
+   ADMIN_API_TOKEN=same-as-vercel-admin-token
+   ```
+3. Botni restart qiling. Mini App **parolsiz** ochiladi (yozuvlar hali `BOT_TOKEN` initData / `ADMIN_API_TOKEN` bilan himoyalangan).
+4. Adminlar: `/admin` menyu. Boshqalar: faqat `/app`, `/help`, `/whoami`.
+
+`ADMIN_TELEGRAM_IDS` bo‘sh bo‘lsa — hech kim admin emas (xavfsiz default).
 
 ### Turso setup (free tier)
 
@@ -100,13 +116,31 @@ cp .env.example .env
 ```env
 BOT_TOKEN=sizning_haqiqiy_bot_tokeningiz
 WEBAPP_URL=https://alcana-xodimlar.vercel.app
+API_BASE_URL=https://alcana-xodimlar.vercel.app
+ADMIN_TELEGRAM_IDS=123456789,987654321
+ADMIN_API_TOKEN=
 ```
 
 ```bash
 npm start
 ```
 
-Production da `WEBAPP_URL` ni Vercel URL bilan bir xil qoldiring.
+Production da `WEBAPP_URL` / `API_BASE_URL` ni Vercel URL bilan bir xil qoldiring. `ADMIN_API_TOKEN` Vercel dagi bilan bir xil boʻlsin (bot yozuvlari uchun).
+
+### Bot buyruqlari
+
+| Command | Who | Description |
+|---|---|---|
+| `/start` | all | Salomlash + Mini App tugma |
+| `/help` | all | Buyruqlar |
+| `/app` | all | Mini App |
+| `/whoami` | all | Telegram user ID (admin roʻyxatiga qoʻshish) |
+| `/admin` | admin | Admin menyu |
+| `/list` (`/staff`) | admin | Xodimlar + progress |
+| `/docs <ism>` | admin | Hujjatlar holati |
+| `/add <Ism Familiya>` | admin | Yangi xodim |
+| `/delete <ism>` | admin | Xodim oʻchirish |
+| `/photo` / `/upload` | admin | Foto/hujjat → Mini App |
 
 ## BotFather
 
@@ -142,4 +176,5 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 3. Vercel da **Redeploy**
 4. `/api/health` ni tekshiring
 5. Bot `WEBAPP_URL` = `https://alcana-xodimlar.vercel.app`
-6. Telegramda Mini App oching — status **Backend ulangan**, MainButton forma ochadi; foto yuklash va koʻp fayl sinab koʻring
+6. Bot `.env`: `ADMIN_TELEGRAM_IDS` ( `/whoami` dan) + `ADMIN_API_TOKEN` → bot restart
+7. Telegramda Mini App oching — status **Backend ulangan**; admin `/admin` ni sinab koʻring

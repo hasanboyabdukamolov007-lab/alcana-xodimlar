@@ -19,6 +19,7 @@ module.exports = async function handler(req, res) {
   if (!isValidDocId(docId)) return sendJson(res, 400, { error: 'Invalid document id' });
 
   try {
+
     await ensureSchema();
     const auth = requireWriteAuth(req);
     if (!auth.ok) return sendJson(res, auth.status || 401, { error: auth.error });

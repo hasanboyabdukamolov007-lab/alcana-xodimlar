@@ -17,6 +17,7 @@ module.exports = async function handler(req, res) {
   if (!isValidDocId(docId)) return sendJson(res, 400, { error: 'Invalid document id' });
 
   try {
+
     await ensureSchema();
 
     if (req.method === 'PATCH') {

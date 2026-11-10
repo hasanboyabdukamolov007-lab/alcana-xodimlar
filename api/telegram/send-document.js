@@ -12,6 +12,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
 
   try {
+
     const auth = requireWriteAuth(req);
     if (!auth.ok) return sendJson(res, auth.status || 401, { error: auth.error });
 

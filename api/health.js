@@ -11,7 +11,6 @@ module.exports = async function handler(req, res) {
   try {
     await ensureSchema();
     const auth = authMode();
-    const url = getDbUrl();
     const usingTurso = Boolean(process.env.TURSO_DATABASE_URL);
     return sendJson(res, 200, {
       ok: true,
