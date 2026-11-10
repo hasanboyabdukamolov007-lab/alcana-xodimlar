@@ -32,7 +32,12 @@ const i18n = {
     positionUz: "Lavozim (UZ)",
     positionRu: "Lavozim (RU)",
     positionEn: "Lavozim (EN)",
-    photoUrl: "Foto URL (ixtiyoriy)",
+    photoUrl: "Foto (ixtiyoriy)",
+    pickPhoto: "Rasm tanlash",
+    changePhoto: "Rasmni almashtirish",
+    clearPhoto: "O'chirish",
+    photoTooLarge: "Rasm juda katta (maks ~3.5MB)",
+    photoInvalid: "Faqat rasm fayllari",
     backendReady: "Backend ulangan",
     demoMode: "Demo rejim",
     loading: "Yuklanmoqda...",
@@ -64,7 +69,12 @@ const i18n = {
     positionUz: "Должность (UZ)",
     positionRu: "Должность (RU)",
     positionEn: "Должность (EN)",
-    photoUrl: "URL фото (необязательно)",
+    photoUrl: "Фото (необязательно)",
+    pickPhoto: "Выбрать фото",
+    changePhoto: "Изменить фото",
+    clearPhoto: "Удалить",
+    photoTooLarge: "Фото слишком большое (макс ~3.5MB)",
+    photoInvalid: "Только файлы изображений",
     backendReady: "Backend подключён",
     demoMode: "Демо режим",
     loading: "Загрузка...",
@@ -96,7 +106,12 @@ const i18n = {
     positionUz: "Position (UZ)",
     positionRu: "Position (RU)",
     positionEn: "Position (EN)",
-    photoUrl: "Photo URL (optional)",
+    photoUrl: "Photo (optional)",
+    pickPhoto: "Choose photo",
+    changePhoto: "Change photo",
+    clearPhoto: "Remove",
+    photoTooLarge: "Photo too large (max ~3.5MB)",
+    photoInvalid: "Only image files",
     backendReady: "Backend connected",
     demoMode: "Demo mode",
     loading: "Loading...",
@@ -113,9 +128,14 @@ let currentLang = "uz";
 function t(key) { return i18n[currentLang][key] || key; }
 
 const API_BASE = ""; // same origin on Vercel / local server
+const MAX_PHOTO_BYTES = 3.5 * 1024 * 1024;
 let backendReady = false;
 let staffMembers = [];
 let editingEmployeeId = null;
+/** @type {File|null} */
+let pendingPhotoFile = null;
+let photoCleared = false;
+let photoObjectUrl = null;
 
 const DEMO_STAFF = [
   {
@@ -206,6 +226,8 @@ function setLang(lang) {
   document.getElementById("label-pos-ru").textContent = t("positionRu");
   document.getElementById("label-pos-en").textContent = t("positionEn");
   document.getElementById("label-photo").textContent = t("photoUrl");
+  document.getElementById("btn-clear-photo").textContent = t("clearPhoto");
+  updatePhotoPickLabel();
   document.getElementById("form-save").textContent = t("save");
   document.getElementById("form-cancel").textContent = t("cancel");
   updateStatusBadge();
@@ -215,6 +237,56 @@ function setLang(lang) {
     const id = window.currentStaffId;
     if (id) showStaffDetail(id);
   }
+}
+
+function updatePhotoPickLabel() {
+  const btn = document.getElementById("btn-pick-photo");
+  const preview = document.getElementById("photo-preview");
+  if (!btn) return;
+  const hasPreview = preview && !preview.classList.contains("hidden") && preview.getAttribute("src");
+  btn.textContent = hasPreview ? t("changePhoto") : t("pickPhoto");
+}
+
+function revokePhotoObjectUrl() {
+  if (photoObjectUrl) {
+    URL.revokeObjectURL(photoObjectUrl);
+    photoObjectUrl = null;
+  }
+}
+
+function setPhotoPreview(src) {
+  const img = document.getElementById("photo-preview");
+  const empty = document.getElementById("photo-preview-empty");
+  const clearBtn = document.getElementById("btn-clear-photo");
+  if (src) {
+    img.src = src;
+    img.classList.remove("hidden");
+    empty.classList.add("hidden");
+    clearBtn.classList.remove("hidden");
+  } else {
+    img.removeAttribute("src");
+    img.classList.add("hidden");
+    empty.classList.remove("hidden");
+    clearBtn.classList.add("hidden");
+  }
+  updatePhotoPickLabel();
+}
+
+function resetPhotoPickerState() {
+  pendingPhotoFile = null;
+  photoCleared = false;
+  revokePhotoObjectUrl();
+  const fileInput = document.getElementById("input-photo-file");
+  if (fileInput) fileInput.value = "";
+}
+
+function employeePhotoSrc(emp) {
+  if (!emp?.photo || emp.photo.includes("pravatar")) return "";
+  const src = emp.photo;
+  if (src.startsWith("/api/") && emp.updatedAt) {
+    return `${src}${src.includes("?") ? "&" : "?"}t=${encodeURIComponent(emp.updatedAt)}`;
+  }
+  return src;
 }
 
 document.querySelectorAll(".lang-btn").forEach(btn => {
@@ -250,6 +322,7 @@ function normalizeEmployee(raw) {
       en: raw.position?.en || ""
     },
     photo: raw.photo || "https://i.pravatar.cc/150?u=" + encodeURIComponent(raw.id || raw.name),
+    updatedAt: raw.updatedAt || raw.updated_at || "",
     documents
   };
 }
@@ -474,6 +547,7 @@ window.openEmployeeForm = function(id) {
     return;
   }
   editingEmployeeId = id || null;
+  resetPhotoPickerState();
   document.getElementById("staff-list").classList.add("hidden");
   document.getElementById("staff-detail").classList.add("hidden");
   document.getElementById("employee-form").classList.remove("hidden");
@@ -485,10 +559,39 @@ window.openEmployeeForm = function(id) {
   document.getElementById("input-pos-uz").value = emp?.position?.uz || "";
   document.getElementById("input-pos-ru").value = emp?.position?.ru || "";
   document.getElementById("input-pos-en").value = emp?.position?.en || "";
-  document.getElementById("input-photo").value = emp?.photo && !emp.photo.includes("pravatar") ? emp.photo : "";
+  setPhotoPreview(employeePhotoSrc(emp));
+};
+
+document.getElementById("input-photo-file").onchange = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    tg.showAlert(t("photoInvalid"));
+    e.target.value = "";
+    return;
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    tg.showAlert(t("photoTooLarge"));
+    e.target.value = "";
+    return;
+  }
+  pendingPhotoFile = file;
+  photoCleared = false;
+  revokePhotoObjectUrl();
+  photoObjectUrl = URL.createObjectURL(file);
+  setPhotoPreview(photoObjectUrl);
+};
+
+document.getElementById("btn-clear-photo").onclick = () => {
+  pendingPhotoFile = null;
+  photoCleared = true;
+  revokePhotoObjectUrl();
+  document.getElementById("input-photo-file").value = "";
+  setPhotoPreview("");
 };
 
 document.getElementById("form-cancel").onclick = () => {
+  resetPhotoPickerState();
   document.getElementById("employee-form").classList.add("hidden");
   if (editingEmployeeId) {
     showStaffDetail(editingEmployeeId);
@@ -497,6 +600,19 @@ document.getElementById("form-cancel").onclick = () => {
     tg.MainButton.show();
   }
 };
+
+async function uploadEmployeePhoto(employeeId, file) {
+  const base64 = await fileToBase64(file);
+  const data = await api(`/api/employees/${employeeId}/photo`, {
+    method: "POST",
+    body: JSON.stringify({
+      filename: file.name || "photo.jpg",
+      mimeType: file.type || "image/jpeg",
+      data: base64
+    })
+  });
+  return data.employee;
+}
 
 document.getElementById("employee-form-el").onsubmit = async (e) => {
   e.preventDefault();
@@ -514,8 +630,7 @@ document.getElementById("employee-form-el").onsubmit = async (e) => {
       uz: document.getElementById("input-pos-uz").value.trim(),
       ru: document.getElementById("input-pos-ru").value.trim(),
       en: document.getElementById("input-pos-en").value.trim()
-    },
-    photo: document.getElementById("input-photo").value.trim()
+    }
   };
 
   const saveBtn = document.getElementById("form-save");
@@ -533,9 +648,19 @@ document.getElementById("employee-form-el").onsubmit = async (e) => {
         body: JSON.stringify(payload)
       });
     }
-    replaceEmployee(data.employee);
+
+    let employee = data.employee;
+    if (pendingPhotoFile) {
+      employee = await uploadEmployeePhoto(employee.id, pendingPhotoFile);
+    } else if (photoCleared && editingEmployeeId) {
+      const cleared = await api(`/api/employees/${employee.id}/photo`, { method: "DELETE" });
+      employee = cleared.employee;
+    }
+
+    resetPhotoPickerState();
+    replaceEmployee(employee);
     document.getElementById("employee-form").classList.add("hidden");
-    showStaffDetail(data.employee.id);
+    showStaffDetail(employee.id);
     tg.HapticFeedback?.notificationOccurred("success");
   } catch (err) {
     tg.showAlert(`${t("saveError")}: ${err.message}`);

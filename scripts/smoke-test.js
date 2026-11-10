@@ -80,6 +80,37 @@ async function main() {
   assert(updated.status === 200 && updated.data.employee.name.includes('Updated'), 'update failed');
   console.log('✓ update employee');
 
+  // Tiny 1x1 PNG
+  const pngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const photoUp = await req('POST', `/api/employees/${id}/photo`, {
+    filename: 'avatar.png',
+    mimeType: 'image/png',
+    data: pngBase64,
+  });
+  assert(
+    photoUp.status === 200 &&
+      photoUp.data.employee?.photo &&
+      String(photoUp.data.employee.photo).includes(`/api/employees/${id}/photo`),
+    `photo upload failed: ${JSON.stringify(photoUp)}`
+  );
+  console.log('✓ upload employee photo');
+
+  const photoGet = await fetch(`${BASE}/api/employees/${id}/photo`);
+  assert(photoGet.status === 200, `photo GET status ${photoGet.status}`);
+  assert(
+    String(photoGet.headers.get('content-type') || '').includes('image/'),
+    `photo content-type ${photoGet.headers.get('content-type')}`
+  );
+  console.log('✓ download employee photo');
+
+  const photoCleared = await req('DELETE', `/api/employees/${id}/photo`);
+  assert(
+    photoCleared.status === 200 && photoCleared.data.employee?.photo === '',
+    `photo clear failed: ${JSON.stringify(photoCleared)}`
+  );
+  console.log('✓ clear employee photo');
+
   const deleted = await req('DELETE', `/api/employees/${id}`);
   assert(deleted.status === 200 && deleted.data.ok, 'delete failed');
   console.log('✓ delete employee');

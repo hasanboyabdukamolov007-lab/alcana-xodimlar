@@ -47,6 +47,14 @@ function matchRoute(pathname) {
     };
   }
 
+  m = pathname.match(/^\/api\/employees\/([^/]+)\/photo\/?$/);
+  if (m) {
+    return {
+      handler: loadHandler('api/employees/[id]/photo.js'),
+      query: { id: decodeURIComponent(m[1]) },
+    };
+  }
+
   m = pathname.match(/^\/api\/employees\/([^/]+)\/?$/);
   if (m) {
     return {

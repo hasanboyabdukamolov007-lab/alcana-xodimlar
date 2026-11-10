@@ -50,6 +50,15 @@ async function ensureSchema() {
       FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
     )
   `);
+  // Profile photo binary (used when Vercel Blob is not configured)
+  for (const col of ['photo_data TEXT', 'photo_mime TEXT']) {
+    try {
+      await db.execute(`ALTER TABLE employees ADD COLUMN ${col}`);
+    } catch (err) {
+      const msg = String(err?.message || err);
+      if (!/duplicate column/i.test(msg)) throw err;
+    }
+  }
   ready = true;
   return db;
 }
@@ -247,6 +256,46 @@ async function getDocumentFile(employeeId, docId) {
   return rows[0] || null;
 }
 
+async function saveEmployeePhoto(employeeId, { photoUrl, photoData, photoMime }) {
+  const db = await ensureSchema();
+  const existing = await getEmployee(employeeId);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+  await db.execute({
+    sql: `UPDATE employees SET
+            photo = ?,
+            photo_data = ?,
+            photo_mime = ?,
+            updated_at = ?
+          WHERE id = ?`,
+    args: [
+      photoUrl || '',
+      photoData || null,
+      photoMime || null,
+      now,
+      employeeId,
+    ],
+  });
+  return getEmployee(employeeId);
+}
+
+async function getEmployeePhotoRow(employeeId) {
+  const db = await ensureSchema();
+  const { rows } = await db.execute({
+    sql: 'SELECT id, photo, photo_data, photo_mime FROM employees WHERE id = ?',
+    args: [employeeId],
+  });
+  return rows[0] || null;
+}
+
+async function clearEmployeePhoto(employeeId) {
+  return saveEmployeePhoto(employeeId, {
+    photoUrl: '',
+    photoData: null,
+    photoMime: null,
+  });
+}
+
 function backendConfigured() {
   return Boolean(process.env.TURSO_DATABASE_URL) || process.env.NODE_ENV !== 'production';
 }
@@ -261,6 +310,9 @@ module.exports = {
   setDocumentPresent,
   saveDocumentFile,
   getDocumentFile,
+  saveEmployeePhoto,
+  getEmployeePhotoRow,
+  clearEmployeePhoto,
   backendConfigured,
   getDbUrl,
 };
