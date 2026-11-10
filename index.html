@@ -48,8 +48,18 @@
         <label id="label-pos-en" for="input-pos-en">Lavozim (EN)</label>
         <input id="input-pos-en" type="text">
 
-        <label id="label-photo" for="input-photo">Foto URL (ixtiyoriy)</label>
-        <input id="input-photo" type="url" placeholder="https://...">
+        <div class="photo-field">
+          <label id="label-photo" for="input-photo-file">Foto (ixtiyoriy)</label>
+          <div class="photo-picker">
+            <img id="photo-preview" class="photo-preview hidden" alt="">
+            <div id="photo-preview-empty" class="photo-preview-empty" aria-hidden="true"></div>
+            <div class="photo-picker-actions">
+              <label class="btn btn-secondary photo-pick-btn" for="input-photo-file" id="btn-pick-photo">Rasm tanlash</label>
+              <input id="input-photo-file" type="file" accept="image/*" hidden>
+              <button type="button" id="btn-clear-photo" class="btn btn-secondary hidden">O'chirish</button>
+            </div>
+          </div>
+        </div>
 
         <div class="form-actions">
           <button type="button" id="form-cancel" class="btn btn-secondary">Bekor qilish</button>

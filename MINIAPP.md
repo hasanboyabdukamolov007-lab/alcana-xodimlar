@@ -3,7 +3,7 @@
 Professional versiya: O‘zbek (asosiy) + Русский + English.  
 Backend: Vercel serverless API + Turso (SQLite) — qarang `README.md`.
 
-## Hujjatlar ro‘yxati (rasmdan + testlar)
+## Hujjatlar ro‘yxati
 
 1. Xodimning shaxsiy ma'lumoti (`personal_info`)
 2. Ishga olish ankеtasi (`application`)
@@ -13,18 +13,25 @@ Backend: Vercel serverless API + Turso (SQLite) — qarang `README.md`.
 6. Korxona ankеtasi (`company_form`)
 7. Mehnat shartnomasi (`contract`)
 8. Texnika xavfsizligi (`safety`)
-9. Sudlanmaganligi haqida ma'lumotnoma (`no_criminal`)
-10. **16Personalities test natijasi** (`personality`)
-11. **Mensa IQ test natijasi** (`iq_test`)
+9. **NPS** (`nps`)
+10. **Hayot g‘ildiragi** (`life_wheel`)
+11. **Valyutaga qarshi tilxat** (`currency_pledge`)
+12. **Noqonuniy ma’lumotlardan foydalanmaslik tilxati** (`illegal_info_pledge`)
+13. **16Personalities test natijasi** (`personality`)
+14. **Mensa IQ test natijasi** (`iq_test`)
+
+Olib tashlangan: Sudlanmaganligi haqida ma'lumotnoma (`no_criminal`).
 
 ## Xususiyatlar
 
 - To‘liq 3 tilda ishlaydi (UZ / RU / EN)
 - Qidiruv (search)
 - Progress bar + Complete / Incomplete holati (faqat yuklangan fayllar hisoblanadi)
-- Har bir hujjat uchun tick + fayl yuklash; faylsiz tick ogohlantirish beradi (UZ/RU/EN)
+- Har bir hujjat slotida **bir nechta fayl** + sana; ro‘yxat UI
+- **Telegramga saqlash** — faylni bot orqali foydalanuvchi chatiga yuboradi
+- Faylsiz tick ogohlantirish beradi (UZ/RU/EN)
 - Yuklash muvaffaqiyatli bo‘lgach hujjat avtomatik tasdiqlanadi
-- Foto yo‘q bo‘lsa stock rasm emas — ism bosh harflari (initials)
+- Xodim fotosi: qurilmadan yuklash (URL emas); yo‘q bo‘lsa initials
 - Yangi xodim qo‘shish / tahrirlash (backend ulanganida)
 - Telegram theme, haptic feedback, initData auth
 

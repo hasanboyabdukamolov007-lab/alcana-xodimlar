@@ -34,9 +34,35 @@ function matchRoute(pathname) {
     return { handler: loadHandler('api/health.js'), query: {} };
   }
 
+  if (pathname === '/api/telegram/send-document') {
+    return { handler: loadHandler('api/telegram/send-document.js'), query: {} };
+  }
+
   let m = pathname.match(/^\/api\/employees\/?$/);
   if (m) {
     return { handler: loadHandler('api/employees/index.js'), query: {} };
+  }
+
+  m = pathname.match(/^\/api\/employees\/([^/]+)\/photo\/?$/);
+  if (m) {
+    return {
+      handler: loadHandler('api/employees/[id]/photo.js'),
+      query: { id: decodeURIComponent(m[1]) },
+    };
+  }
+
+  m = pathname.match(
+    /^\/api\/employees\/([^/]+)\/docs\/([^/]+)\/files\/([^/]+)\/?$/
+  );
+  if (m) {
+    return {
+      handler: loadHandler('api/employees/[id]/docs/[docId]/files/[fileId].js'),
+      query: {
+        id: decodeURIComponent(m[1]),
+        docId: decodeURIComponent(m[2]),
+        fileId: decodeURIComponent(m[3]),
+      },
+    };
   }
 
   m = pathname.match(/^\/api\/employees\/([^/]+)\/docs\/([^/]+)\/?$/);
@@ -52,6 +78,18 @@ function matchRoute(pathname) {
     return {
       handler: loadHandler('api/employees/[id].js'),
       query: { id: decodeURIComponent(m[1]) },
+    };
+  }
+
+  m = pathname.match(/^\/api\/files\/([^/]+)\/([^/]+)\/([^/]+)\/?$/);
+  if (m) {
+    return {
+      handler: loadHandler('api/files/[employeeId]/[docId]/[fileId].js'),
+      query: {
+        employeeId: decodeURIComponent(m[1]),
+        docId: decodeURIComponent(m[2]),
+        fileId: decodeURIComponent(m[3]),
+      },
     };
   }
 

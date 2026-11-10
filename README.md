@@ -8,7 +8,9 @@ Repo ildizida Mini App (`index.html`, `app.js`, `styles.css`) va Vercel serverle
 ## Xususiyatlar
 
 - Xodimlarni qoʻshish / tahrirlash (real DB)
-- 11 ta majburiy hujjat checklist (belgilash + fayl yuklash)
+- 14 ta majburiy hujjat checklist (belgilash + **koʻp fayl** yuklash, har biri bilan sana)
+- Xodim fotosi: qurilma kamerasi/galereyadan yuklash
+- **Telegramga saqlash** — faylni ochgan foydalanuvchi Telegram chatiga yuborish
 - UZ / RU / EN
 - Yozuv API: Telegram Mini App `initData` yoki `ADMIN_API_TOKEN`
 - Fayllar: Vercel Blob (ixtiyoriy) yoki DB ichida (kichik fayllar)
@@ -21,7 +23,7 @@ Vercel → Project → **Settings → Environment Variables** (Production + Prev
 |---|---|---|
 | `TURSO_DATABASE_URL` | **Yes (prod)** | Turso libSQL URL, e.g. `libsql://…turso.io` |
 | `TURSO_AUTH_TOKEN` | **Yes (prod)** | Turso auth token |
-| `BOT_TOKEN` | Recommended | Same token as the Telegram bot — validates WebApp `initData` on writes |
+| `BOT_TOKEN` | Recommended | Same token as the Telegram bot — validates WebApp `initData` on writes **and** powers «Telegramga saqlash» (`sendDocument`) |
 | `ADMIN_API_TOKEN` | Optional | Shared secret for scripts/admin (`X-Admin-Token` header) |
 | `BLOB_READ_WRITE_TOKEN` | Optional | Vercel Blob token; if unset, files store as base64 in DB (~3.5MB limit) |
 
@@ -37,7 +39,8 @@ Root `.env.example` lists the same keys for local use.
 4. Paste both into Vercel env vars
 5. **Redeploy** the project (Deployments → … → Redeploy, or push to `main`)
 
-Schema is created automatically on first API request (`/api/health` or `/api/employees`).
+Schema is created automatically on first API request (`/api/health` or `/api/employees`).  
+Legacy single-file rows migrate into `document_files` automatically.
 
 ### Auth
 
@@ -45,6 +48,7 @@ Schema is created automatically on first API request (`/api/health` or `/api/emp
 - If `BOT_TOKEN` is set, the API HMAC-validates initData.
 - Alternatively send `X-Admin-Token: <ADMIN_API_TOKEN>` (or `Authorization: Bearer …`).
 - If **neither** `BOT_TOKEN` nor `ADMIN_API_TOKEN` is set, writes are open (local/dev only — set at least one in production).
+- «Telegramga saqlash» needs `BOT_TOKEN` **and** a real Mini App `initData` user (chat id).
 
 ## Vercel deploy
 
@@ -117,20 +121,25 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/api/health` | no | Backend/DB status |
-| GET | `/api/employees` | no | List employees + doc checklist |
+| GET | `/api/employees` | no | List employees + doc checklist (each slot has `files[]`) |
 | POST | `/api/employees` | write | Create employee |
 | GET | `/api/employees/:id` | no | One employee |
 | PUT | `/api/employees/:id` | write | Update employee |
 | DELETE | `/api/employees/:id` | write | Delete employee |
-| PATCH | `/api/employees/:id/docs/:docId` | write | `{ "present": true/false }` — `present: true` requires an uploaded file (`FILE_REQUIRED` otherwise) |
-| POST | `/api/employees/:id/docs/:docId` | write | Upload `{ filename, mimeType, data(base64) }` (marks doc complete) |
-| GET | `/api/files/:employeeId/:docId` | no | Download / redirect to blob |
+| POST/GET/DELETE | `/api/employees/:id/photo` | write (POST/DELETE) | Profile photo upload / serve / clear |
+| PATCH | `/api/employees/:id/docs/:docId` | write | `{ "present": true/false }` — `present: true` requires ≥1 file; `false` clears all files in slot |
+| POST | `/api/employees/:id/docs/:docId` | write | Append file `{ filename, mimeType, data(base64), date? }` |
+| PATCH | `/api/employees/:id/docs/:docId/files/:fileId` | write | `{ "date": "YYYY-MM-DD" }` |
+| DELETE | `/api/employees/:id/docs/:docId/files/:fileId` | write | Remove one file from the slot |
+| GET | `/api/files/:employeeId/:docId` | no | Download latest file in slot |
+| GET | `/api/files/:employeeId/:docId/:fileId` | no | Download specific file |
+| POST | `/api/telegram/send-document` | write + Telegram user | `{ employeeId, docId, fileId }` → bot `sendDocument` to chatting user |
 
 ## Redeploy checklist (foydalanuvchi uchun)
 
 1. Turso URL + token ni Vercel Environment Variables ga qoʻying
-2. `BOT_TOKEN` (va ixtiyoriy `ADMIN_API_TOKEN`) ni qoʻying
+2. `BOT_TOKEN` (va ixtiyoriy `ADMIN_API_TOKEN`) ni qoʻying — «Telegramga saqlash» uchun `BOT_TOKEN` majburiy
 3. Vercel da **Redeploy**
 4. `/api/health` ni tekshiring
 5. Bot `WEBAPP_URL` = `https://alcana-xodimlar.vercel.app`
-6. Telegramda Mini App oching — status **Backend ulangan**, MainButton forma ochadi
+6. Telegramda Mini App oching — status **Backend ulangan**, MainButton forma ochadi; foto yuklash va koʻp fayl sinab koʻring

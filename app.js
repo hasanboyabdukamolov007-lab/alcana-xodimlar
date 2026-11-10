@@ -20,8 +20,13 @@ const i18n = {
     complete: "To'liq",
     incomplete: "To'liq emas",
     upload: "Yuklash",
+    addFile: "Yana fayl",
     view: "Ko'rish",
+    saveToTelegram: "Telegramga saqlash",
+    deleteFile: "O'chirish",
     noFile: "Fayl yo'q",
+    filesCount: "fayl",
+    fileDate: "Sana",
     fileRequired: "Avval fayl yuklang. Faylsiz belgilash mumkin emas.",
     required: "Majburiy",
     tests: "Test natijalari",
@@ -33,7 +38,12 @@ const i18n = {
     positionUz: "Lavozim (UZ)",
     positionRu: "Lavozim (RU)",
     positionEn: "Lavozim (EN)",
-    photoUrl: "Foto URL (ixtiyoriy)",
+    photoUrl: "Foto (ixtiyoriy)",
+    pickPhoto: "Rasm tanlash",
+    changePhoto: "Rasmni almashtirish",
+    clearPhoto: "O'chirish",
+    photoTooLarge: "Rasm juda katta (maks ~3.5MB)",
+    photoInvalid: "Faqat rasm fayllari",
     backendReady: "Backend ulangan",
     demoMode: "Demo rejim",
     loading: "Yuklanmoqda...",
@@ -42,7 +52,10 @@ const i18n = {
     loadError: "Ma'lumot yuklanmadi",
     nameRequired: "Ism majburiy",
     uploaded: "Yuklandi",
-    deleteConfirm: "Xodimni o'chirishni tasdiqlaysizmi?"
+    sentToTelegram: "Telegramga yuborildi",
+    telegramSendError: "Telegramga yuborib bo'lmadi",
+    deleteConfirm: "Xodimni o'chirishni tasdiqlaysizmi?",
+    deleteFileConfirm: "Bu faylni o'chirasizmi?"
   },
   ru: {
     title: "Документы сотрудников",
@@ -53,8 +66,13 @@ const i18n = {
     complete: "Полный",
     incomplete: "Неполный",
     upload: "Загрузить",
+    addFile: "Ещё файл",
     view: "Просмотр",
+    saveToTelegram: "Сохранить в Telegram",
+    deleteFile: "Удалить",
     noFile: "Нет файла",
+    filesCount: "файл(ов)",
+    fileDate: "Дата",
     fileRequired: "Сначала загрузите файл. Без файла отметить нельзя.",
     required: "Обязательно",
     tests: "Результаты тестов",
@@ -66,7 +84,12 @@ const i18n = {
     positionUz: "Должность (UZ)",
     positionRu: "Должность (RU)",
     positionEn: "Должность (EN)",
-    photoUrl: "URL фото (необязательно)",
+    photoUrl: "Фото (необязательно)",
+    pickPhoto: "Выбрать фото",
+    changePhoto: "Изменить фото",
+    clearPhoto: "Удалить",
+    photoTooLarge: "Фото слишком большое (макс ~3.5MB)",
+    photoInvalid: "Только файлы изображений",
     backendReady: "Backend подключён",
     demoMode: "Демо режим",
     loading: "Загрузка...",
@@ -75,7 +98,10 @@ const i18n = {
     loadError: "Не удалось загрузить данные",
     nameRequired: "Имя обязательно",
     uploaded: "Загружено",
-    deleteConfirm: "Удалить сотрудника?"
+    sentToTelegram: "Отправлено в Telegram",
+    telegramSendError: "Не удалось отправить в Telegram",
+    deleteConfirm: "Удалить сотрудника?",
+    deleteFileConfirm: "Удалить этот файл?"
   },
   en: {
     title: "Staff Documents",
@@ -86,8 +112,13 @@ const i18n = {
     complete: "Complete",
     incomplete: "Incomplete",
     upload: "Upload",
+    addFile: "Add file",
     view: "View",
+    saveToTelegram: "Save to Telegram",
+    deleteFile: "Delete",
     noFile: "No file",
+    filesCount: "file(s)",
+    fileDate: "Date",
     fileRequired: "Upload a file first. Cannot mark complete without a file.",
     required: "Required",
     tests: "Test Results",
@@ -99,7 +130,12 @@ const i18n = {
     positionUz: "Position (UZ)",
     positionRu: "Position (RU)",
     positionEn: "Position (EN)",
-    photoUrl: "Photo URL (optional)",
+    photoUrl: "Photo (optional)",
+    pickPhoto: "Choose photo",
+    changePhoto: "Change photo",
+    clearPhoto: "Remove",
+    photoTooLarge: "Photo too large (max ~3.5MB)",
+    photoInvalid: "Only image files",
     backendReady: "Backend connected",
     demoMode: "Demo mode",
     loading: "Loading...",
@@ -108,7 +144,10 @@ const i18n = {
     loadError: "Failed to load data",
     nameRequired: "Name is required",
     uploaded: "Uploaded",
-    deleteConfirm: "Delete this employee?"
+    sentToTelegram: "Sent to Telegram",
+    telegramSendError: "Could not send to Telegram",
+    deleteConfirm: "Delete this employee?",
+    deleteFileConfirm: "Delete this file?"
   }
 };
 
@@ -116,9 +155,14 @@ let currentLang = "uz";
 function t(key) { return i18n[currentLang][key] || key; }
 
 const API_BASE = ""; // same origin on Vercel / local server
+const MAX_PHOTO_BYTES = 3.5 * 1024 * 1024;
 let backendReady = false;
 let staffMembers = [];
 let editingEmployeeId = null;
+/** @type {File|null} */
+let pendingPhotoFile = null;
+let photoCleared = false;
+let photoObjectUrl = null;
 
 const DEMO_STAFF = [
   {
@@ -127,11 +171,26 @@ const DEMO_STAFF = [
     position: { uz: "Dasturchi", ru: "Программист", en: "Software Engineer" },
     photo: "",
     documents: {
-      passport: { present: true, filename: "passport_ali.pdf", date: "2026-10-15", hasFile: true },
-      photo_3x4: { present: true, filename: "photos_ali.zip", date: "2026-09-01", hasFile: true },
-      contract: { present: true, filename: "contract_ali.pdf", date: "2026-08-20", hasFile: true },
-      personality: { present: true, filename: "16p_ali.pdf", date: "2026-11-05", hasFile: true },
-      iq_test: { present: false }
+      passport: {
+        present: true,
+        files: [
+          { id: "d1", filename: "passport_ali.pdf", date: "2026-10-15", hasFile: true },
+          { id: "d2", filename: "passport_ali_page2.pdf", date: "2026-10-16", hasFile: true }
+        ]
+      },
+      photo_3x4: {
+        present: true,
+        files: [{ id: "d3", filename: "photos_ali.zip", date: "2026-09-01", hasFile: true }]
+      },
+      contract: {
+        present: true,
+        files: [{ id: "d4", filename: "contract_ali.pdf", date: "2026-08-20", hasFile: true }]
+      },
+      personality: {
+        present: true,
+        files: [{ id: "d5", filename: "16p_ali.pdf", date: "2026-11-05", hasFile: true }]
+      },
+      iq_test: { present: false, files: [] }
     }
   },
   {
@@ -140,11 +199,23 @@ const DEMO_STAFF = [
     position: { uz: "HR menejer", ru: "HR менеджер", en: "HR Manager" },
     photo: "",
     documents: {
-      passport: { present: true, filename: "passport_malika.pdf", date: "2026-11-01", hasFile: true },
-      photo_3x4: { present: true, filename: "photo_malika.jpg", date: "2026-11-01", hasFile: true },
-      contract: { present: false },
-      personality: { present: true, filename: "16p_malika.pdf", date: "2026-10-28", hasFile: true },
-      iq_test: { present: true, filename: "mensa_malika.pdf", date: "2026-10-30", hasFile: true }
+      passport: {
+        present: true,
+        files: [{ id: "e1", filename: "passport_malika.pdf", date: "2026-11-01", hasFile: true }]
+      },
+      photo_3x4: {
+        present: true,
+        files: [{ id: "e2", filename: "photo_malika.jpg", date: "2026-11-01", hasFile: true }]
+      },
+      contract: { present: false, files: [] },
+      personality: {
+        present: true,
+        files: [{ id: "e3", filename: "16p_malika.pdf", date: "2026-10-28", hasFile: true }]
+      },
+      iq_test: {
+        present: true,
+        files: [{ id: "e4", filename: "mensa_malika.pdf", date: "2026-10-30", hasFile: true }]
+      }
     }
   },
   {
@@ -153,10 +224,13 @@ const DEMO_STAFF = [
     position: { uz: "Buxgalter", ru: "Бухгалтер", en: "Accountant" },
     photo: "",
     documents: {
-      passport: { present: false },
-      photo_3x4: { present: true, filename: "photo_jasur.jpg", date: "2026-09-15", hasFile: true },
-      personality: { present: false },
-      iq_test: { present: false }
+      passport: { present: false, files: [] },
+      photo_3x4: {
+        present: true,
+        files: [{ id: "f1", filename: "photo_jasur.jpg", date: "2026-09-15", hasFile: true }]
+      },
+      personality: { present: false, files: [] },
+      iq_test: { present: false, files: [] }
     }
   }
 ];
@@ -209,6 +283,9 @@ function setLang(lang) {
   document.getElementById("label-pos-ru").textContent = t("positionRu");
   document.getElementById("label-pos-en").textContent = t("positionEn");
   document.getElementById("label-photo").textContent = t("photoUrl");
+  const clearBtn = document.getElementById("btn-clear-photo");
+  if (clearBtn) clearBtn.textContent = t("clearPhoto");
+  updatePhotoPickLabel();
   document.getElementById("form-save").textContent = t("save");
   document.getElementById("form-cancel").textContent = t("cancel");
   updateStatusBadge();
@@ -220,11 +297,61 @@ function setLang(lang) {
   }
 }
 
+function updatePhotoPickLabel() {
+  const btn = document.getElementById("btn-pick-photo");
+  const preview = document.getElementById("photo-preview");
+  if (!btn) return;
+  const hasPreview = preview && !preview.classList.contains("hidden") && preview.getAttribute("src");
+  btn.textContent = hasPreview ? t("changePhoto") : t("pickPhoto");
+}
+
+function revokePhotoObjectUrl() {
+  if (photoObjectUrl) {
+    URL.revokeObjectURL(photoObjectUrl);
+    photoObjectUrl = null;
+  }
+}
+
+function setPhotoPreview(src) {
+  const img = document.getElementById("photo-preview");
+  const empty = document.getElementById("photo-preview-empty");
+  const clearBtn = document.getElementById("btn-clear-photo");
+  if (src) {
+    img.src = src;
+    img.classList.remove("hidden");
+    empty.classList.add("hidden");
+    clearBtn.classList.remove("hidden");
+  } else {
+    img.removeAttribute("src");
+    img.classList.add("hidden");
+    empty.classList.remove("hidden");
+    clearBtn.classList.add("hidden");
+  }
+  updatePhotoPickLabel();
+}
+
+function resetPhotoPickerState() {
+  pendingPhotoFile = null;
+  photoCleared = false;
+  revokePhotoObjectUrl();
+  const fileInput = document.getElementById("input-photo-file");
+  if (fileInput) fileInput.value = "";
+}
+
+function employeePhotoSrc(emp) {
+  if (!isRealPhoto(emp?.photo)) return "";
+  const src = emp.photo;
+  if (src.startsWith("/api/") && emp.updatedAt) {
+    return `${src}${src.includes("?") ? "&" : "?"}t=${encodeURIComponent(emp.updatedAt)}`;
+  }
+  return src;
+}
+
 document.querySelectorAll(".lang-btn").forEach(btn => {
   btn.onclick = () => setLang(btn.dataset.lang);
 });
 
-// Required documents (from image + tests)
+// Required documents (updated checklist)
 const REQUIRED_DOCS = [
   { id: "personal_info", names: { uz: "Xodimning shaxsiy ma'lumoti", ru: "Личные данные сотрудника", en: "Personal Information Form" }, desc: { uz: "To'ldirilgan shaxsiy anketa", ru: "Заполненная анкета", en: "Completed personal form" } },
   { id: "application", names: { uz: "Ishga olish ankеtasi", ru: "Анкета при приеме на работу", en: "Employment Application Form" }, desc: { uz: "Ishga kirish ankеtasi", ru: "Анкета", en: "Job application" } },
@@ -234,7 +361,10 @@ const REQUIRED_DOCS = [
   { id: "company_form", names: { uz: "Korxona ankеtasi", ru: "Анкета предприятия", en: "Company Questionnaire" }, desc: { uz: "Ichki korxona ankеtasi", ru: "Внутренняя анкета", en: "Internal company form" } },
   { id: "contract", names: { uz: "Mehnat shartnomasi", ru: "Трудовой договор", en: "Employment Contract" }, desc: { uz: "Imzolangan mehnat shartnomasi", ru: "Подписанный договор", en: "Signed labor contract" } },
   { id: "safety", names: { uz: "Texnika xavfsizligi", ru: "Техника безопасности", en: "Safety Training" }, desc: { uz: "Mehnat muhofazasi bo'yicha yo'riqnoma", ru: "Инструктаж по охране труда", en: "Occupational safety briefing" } },
-  { id: "no_criminal", names: { uz: "Sudlanmaganligi haqida ma'lumotnoma", ru: "Справка об отсутствии судимости", en: "No Criminal Record Certificate" }, desc: { uz: "Ma'lumotnoma", ru: "Справка", en: "Certificate" } },
+  { id: "nps", names: { uz: "NPS", ru: "NPS", en: "NPS" }, desc: { uz: "NPS so'rovnomasi / natijasi", ru: "Анкета / результат NPS", en: "NPS survey / result" } },
+  { id: "life_wheel", names: { uz: "Hayot g'ildiragi", ru: "Колесо жизни", en: "Wheel of Life" }, desc: { uz: "Hayot g'ildiragi testi", ru: "Тест «Колесо жизни»", en: "Wheel of Life assessment" } },
+  { id: "currency_pledge", names: { uz: "Valyutaga qarshi tilxat", ru: "Расписка против валюты", en: "Anti-currency pledge" }, desc: { uz: "Valyuta qoidalari bo'yicha tilxat", ru: "Расписка по валютным правилам", en: "Pledge regarding currency rules" } },
+  { id: "illegal_info_pledge", names: { uz: "Noqonuniy ma'lumotlardan foydalanmaslik tilxati", ru: "Расписка о неиспользовании незаконной информации", en: "Illegal information non-use pledge" }, desc: { uz: "Noqonuniy ma'lumotlarga oid tilxat", ru: "Расписка о незаконной информации", en: "Pledge not to use illegal information" } },
   { id: "personality", names: { uz: "16Personalities test natijasi", ru: "Результат теста 16Personalities", en: "16Personalities Test Result" }, desc: { uz: "Shaxsiyat testi natijasi (PDF/screenshot)", ru: "Результат теста личности", en: "Personality test result" } },
   { id: "iq_test", names: { uz: "Mensa IQ test natijasi", ru: "Результат теста Mensa IQ", en: "Mensa IQ Test Result" }, desc: { uz: "IQ testi natijasi", ru: "Результат IQ теста", en: "IQ test result" } }
 ];
@@ -254,21 +384,39 @@ function initialsFromName(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function docFiles(data) {
+  if (!data) return [];
+  if (Array.isArray(data.files) && data.files.length) {
+    return data.files.filter((f) => f && (f.hasFile || f.url || f.filename));
+  }
+  // Legacy single-file shape
+  if (data.hasFile || data.url || data.filename) {
+    return [{
+      id: data.id || "legacy",
+      filename: data.filename,
+      date: data.date,
+      url: data.url,
+      mimeType: data.mimeType,
+      hasFile: true
+    }];
+  }
+  return [];
+}
+
 function hasDocFile(data) {
-  if (!data) return false;
-  return Boolean(data.hasFile || data.url || data.filename);
+  return docFiles(data).length > 0;
 }
 
 function isDocComplete(data) {
-  // Confirmed only when a file exists (upload auto-marks present).
   return hasDocFile(data);
 }
 
 function avatarHtml(staff, extraStyle = "") {
   const styleAttr = extraStyle ? ` style="${extraStyle}"` : "";
   const initials = escapeHtml(initialsFromName(staff.name));
-  if (isRealPhoto(staff.photo)) {
-    return `<img class="avatar" src="${escapeHtml(staff.photo)}" alt=""${styleAttr} onerror="replaceBrokenAvatar(this,'${initials}')">`;
+  const src = employeePhotoSrc(staff);
+  if (src) {
+    return `<img class="avatar" src="${escapeHtml(src)}" alt=""${styleAttr} onerror="replaceBrokenAvatar(this,'${initials}')">`;
   }
   return `<div class="avatar avatar-initials"${styleAttr} aria-hidden="true">${initials}</div>`;
 }
@@ -284,12 +432,17 @@ window.replaceBrokenAvatar = function(img, initials) {
 function normalizeEmployee(raw) {
   const documents = {};
   REQUIRED_DOCS.forEach(doc => {
-    const src = raw.documents?.[doc.id] || { present: false };
-    const complete = isDocComplete(src);
+    const src = raw.documents?.[doc.id] || { present: false, files: [] };
+    const files = docFiles(src);
+    const complete = files.length > 0;
     documents[doc.id] = {
       ...src,
+      files,
       present: complete,
-      hasFile: complete
+      hasFile: complete,
+      filename: files[0]?.filename,
+      date: files[0]?.date,
+      url: files[0]?.url
     };
   });
   return {
@@ -301,6 +454,7 @@ function normalizeEmployee(raw) {
       en: raw.position?.en || ""
     },
     photo: isRealPhoto(raw.photo) ? raw.photo.trim() : "",
+    updatedAt: raw.updatedAt || raw.updated_at || "",
     documents
   };
 }
@@ -360,6 +514,36 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+function fileListHtml(staffId, docId, files) {
+  if (!files.length) {
+    return `<div class="file-info">${t("noFile")}</div>`;
+  }
+  return `
+    <ul class="file-list">
+      ${files.map((f) => `
+        <li class="file-row">
+          <div class="file-meta">
+            <span class="file-name">📄 ${escapeHtml(f.filename || docId)}</span>
+            <label class="file-date-label">
+              ${t("fileDate")}
+              <input type="date" class="file-date-input"
+                value="${escapeHtml(f.date || "")}"
+                ${backendReady && f.id && f.id !== "legacy" ? `onchange="updateFileDate('${staffId}','${docId}','${f.id}', this.value)"` : "disabled"}>
+            </label>
+          </div>
+          <div class="file-actions">
+            <button type="button" class="view-btn" onclick="viewFile('${staffId}','${docId}','${f.id || ""}')">${t("view")}</button>
+            ${backendReady && f.id && f.id !== "legacy"
+              ? `<button type="button" class="tg-save-btn" onclick="saveFileToTelegram('${staffId}','${docId}','${f.id}')">${t("saveToTelegram")}</button>
+                 <button type="button" class="danger-btn" onclick="removeFile('${staffId}','${docId}','${f.id}')">${t("deleteFile")}</button>`
+              : ""}
+          </div>
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
 function showStaffDetail(id) {
   window.currentStaffId = id;
   const staff = staffMembers.find(s => s.id === id);
@@ -383,21 +567,24 @@ function showStaffDetail(id) {
   `;
 
   REQUIRED_DOCS.forEach(doc => {
-    const data = staff.documents[doc.id] || { present: false };
-    const checked = isDocComplete(data);
-    const canView = checked;
+    const data = staff.documents[doc.id] || { present: false, files: [] };
+    const files = docFiles(data);
+    const checked = files.length > 0;
     html += `
       <div class="doc-item">
         <div class="checkbox ${checked ? "checked" : ""}" onclick="toggleDoc('${id}', '${doc.id}')">${checked ? "✓" : ""}</div>
         <div class="doc-content">
           <div class="doc-name">${doc.names[currentLang]}</div>
           <div class="doc-desc">${doc.desc[currentLang]}</div>
-          <div class="file-info">${data.filename ? `📄 ${escapeHtml(data.filename)} • ${data.date || ""}` : t("noFile")}</div>
-        </div>
-        <div class="actions">
-          ${canView
-            ? `<button class="view-btn" onclick="viewDoc('${id}', '${doc.id}')">${t("view")}</button>`
-            : `<button class="upload-btn" onclick="uploadDoc('${id}', '${doc.id}')">${t("upload")}</button>`}
+          <div class="file-info">${files.length ? `${files.length} ${t("filesCount")}` : t("noFile")}</div>
+          ${fileListHtml(id, doc.id, files)}
+          <div class="upload-row">
+            <label class="file-date-label">
+              ${t("fileDate")}
+              <input type="date" id="upload-date-${doc.id}" class="file-date-input" value="${new Date().toISOString().split("T")[0]}">
+            </label>
+            <button type="button" class="upload-btn" onclick="uploadDoc('${id}', '${doc.id}')">${checked ? t("addFile") : t("upload")}</button>
+          </div>
         </div>
       </div>
     `;
@@ -419,11 +606,10 @@ document.getElementById("search-input").oninput = renderStaffList;
 window.toggleDoc = async function(staffId, docId) {
   const staff = staffMembers.find(s => s.id === staffId);
   if (!staff) return;
-  if (!staff.documents[docId]) staff.documents[docId] = { present: false };
+  if (!staff.documents[docId]) staff.documents[docId] = { present: false, files: [] };
   const currentlyComplete = isDocComplete(staff.documents[docId]);
   const next = !currentlyComplete;
 
-  // Completing without a file is not allowed — warn and keep unchecked.
   if (next && !hasDocFile(staff.documents[docId])) {
     tg.showAlert(t("fileRequired"));
     tg.HapticFeedback?.notificationOccurred?.("error");
@@ -448,7 +634,7 @@ window.toggleDoc = async function(staffId, docId) {
     }
   } else {
     if (!next) {
-      staff.documents[docId] = { present: false };
+      staff.documents[docId] = { present: false, files: [] };
     } else {
       staff.documents[docId].present = true;
       staff.documents[docId].hasFile = true;
@@ -467,6 +653,8 @@ window.uploadDoc = function(staffId, docId) {
     if (!file) return;
     const staff = staffMembers.find(s => s.id === staffId);
     if (!staff) return;
+    const dateEl = document.getElementById(`upload-date-${docId}`);
+    const date = (dateEl && dateEl.value) || new Date().toISOString().split("T")[0];
 
     if (backendReady) {
       try {
@@ -476,7 +664,8 @@ window.uploadDoc = function(staffId, docId) {
           body: JSON.stringify({
             filename: file.name,
             mimeType: file.type || "application/octet-stream",
-            data: base64
+            data: base64,
+            date
           })
         });
         replaceEmployee(data.employee);
@@ -488,11 +677,16 @@ window.uploadDoc = function(staffId, docId) {
       return;
     }
 
-    staff.documents[docId] = {
-      present: true,
+    if (!staff.documents[docId]) staff.documents[docId] = { present: false, files: [] };
+    if (!Array.isArray(staff.documents[docId].files)) staff.documents[docId].files = [];
+    staff.documents[docId].files.push({
+      id: `demo-${Date.now()}`,
       filename: file.name,
-      date: new Date().toISOString().split("T")[0]
-    };
+      date,
+      hasFile: true
+    });
+    staff.documents[docId].present = true;
+    staff.documents[docId].hasFile = true;
     showStaffDetail(staffId);
     tg.showAlert(`${t("uploaded")}: ${file.name}`);
   };
@@ -512,18 +706,72 @@ function fileToBase64(file) {
   });
 }
 
-window.viewDoc = function(staffId, docId) {
+window.viewFile = function(staffId, docId, fileId) {
   const staff = staffMembers.find(s => s.id === staffId);
-  const data = staff?.documents?.[docId];
-  if (!data) return;
+  const files = docFiles(staff?.documents?.[docId]);
+  const file = files.find((f) => f.id === fileId) || files[0];
+  if (!file) return;
 
-  if (backendReady && (data.hasFile || data.url || data.filename)) {
-    const url = data.url || `/api/files/${staffId}/${docId}`;
+  if (backendReady && file.id && file.id !== "legacy") {
+    const url = file.url || `/api/files/${staffId}/${docId}/${file.id}`;
     if (tg.openLink) tg.openLink(url.startsWith("http") ? url : `${window.location.origin}${url}`);
     else window.open(url, "_blank");
     return;
   }
-  tg.showAlert(`Hujjat: ${data.filename || docId}`);
+  if (backendReady) {
+    const url = file.url || `/api/files/${staffId}/${docId}`;
+    if (tg.openLink) tg.openLink(url.startsWith("http") ? url : `${window.location.origin}${url}`);
+    else window.open(url, "_blank");
+    return;
+  }
+  tg.showAlert(`Hujjat: ${file.filename || docId}`);
+};
+
+window.viewDoc = function(staffId, docId) {
+  const files = docFiles(staffMembers.find(s => s.id === staffId)?.documents?.[docId]);
+  if (files[0]) window.viewFile(staffId, docId, files[0].id);
+};
+
+window.updateFileDate = async function(staffId, docId, fileId, date) {
+  if (!backendReady || !date) return;
+  try {
+    const data = await api(`/api/employees/${staffId}/docs/${docId}/files/${fileId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ date })
+    });
+    replaceEmployee(data.employee);
+    showStaffDetail(staffId);
+  } catch (err) {
+    tg.showAlert(`${t("saveError")}: ${err.message}`);
+  }
+};
+
+window.removeFile = async function(staffId, docId, fileId) {
+  if (!backendReady) return;
+  if (!window.confirm(t("deleteFileConfirm"))) return;
+  try {
+    const data = await api(`/api/employees/${staffId}/docs/${docId}/files/${fileId}`, {
+      method: "DELETE"
+    });
+    replaceEmployee(data.employee);
+    showStaffDetail(staffId);
+  } catch (err) {
+    tg.showAlert(`${t("saveError")}: ${err.message}`);
+  }
+};
+
+window.saveFileToTelegram = async function(staffId, docId, fileId) {
+  if (!backendReady) return;
+  try {
+    await api("/api/telegram/send-document", {
+      method: "POST",
+      body: JSON.stringify({ employeeId: staffId, docId, fileId })
+    });
+    tg.showAlert(t("sentToTelegram"));
+    tg.HapticFeedback?.notificationOccurred?.("success");
+  } catch (err) {
+    tg.showAlert(`${t("telegramSendError")}: ${err.message}`);
+  }
 };
 
 function replaceEmployee(raw) {
@@ -539,6 +787,7 @@ window.openEmployeeForm = function(id) {
     return;
   }
   editingEmployeeId = id || null;
+  resetPhotoPickerState();
   document.getElementById("staff-list").classList.add("hidden");
   document.getElementById("staff-detail").classList.add("hidden");
   document.getElementById("employee-form").classList.remove("hidden");
@@ -550,10 +799,39 @@ window.openEmployeeForm = function(id) {
   document.getElementById("input-pos-uz").value = emp?.position?.uz || "";
   document.getElementById("input-pos-ru").value = emp?.position?.ru || "";
   document.getElementById("input-pos-en").value = emp?.position?.en || "";
-  document.getElementById("input-photo").value = isRealPhoto(emp?.photo) ? emp.photo : "";
+  setPhotoPreview(employeePhotoSrc(emp));
+};
+
+document.getElementById("input-photo-file").onchange = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)) {
+    tg.showAlert(t("photoInvalid"));
+    e.target.value = "";
+    return;
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    tg.showAlert(t("photoTooLarge"));
+    e.target.value = "";
+    return;
+  }
+  pendingPhotoFile = file;
+  photoCleared = false;
+  revokePhotoObjectUrl();
+  photoObjectUrl = URL.createObjectURL(file);
+  setPhotoPreview(photoObjectUrl);
+};
+
+document.getElementById("btn-clear-photo").onclick = () => {
+  pendingPhotoFile = null;
+  photoCleared = true;
+  revokePhotoObjectUrl();
+  document.getElementById("input-photo-file").value = "";
+  setPhotoPreview("");
 };
 
 document.getElementById("form-cancel").onclick = () => {
+  resetPhotoPickerState();
   document.getElementById("employee-form").classList.add("hidden");
   if (editingEmployeeId) {
     showStaffDetail(editingEmployeeId);
@@ -562,6 +840,19 @@ document.getElementById("form-cancel").onclick = () => {
     tg.MainButton.show();
   }
 };
+
+async function uploadEmployeePhoto(employeeId, file) {
+  const base64 = await fileToBase64(file);
+  const data = await api(`/api/employees/${employeeId}/photo`, {
+    method: "POST",
+    body: JSON.stringify({
+      filename: file.name || "photo.jpg",
+      mimeType: file.type || "image/jpeg",
+      data: base64
+    })
+  });
+  return data.employee;
+}
 
 document.getElementById("employee-form-el").onsubmit = async (e) => {
   e.preventDefault();
@@ -579,8 +870,7 @@ document.getElementById("employee-form-el").onsubmit = async (e) => {
       uz: document.getElementById("input-pos-uz").value.trim(),
       ru: document.getElementById("input-pos-ru").value.trim(),
       en: document.getElementById("input-pos-en").value.trim()
-    },
-    photo: document.getElementById("input-photo").value.trim()
+    }
   };
 
   const saveBtn = document.getElementById("form-save");
@@ -598,9 +888,19 @@ document.getElementById("employee-form-el").onsubmit = async (e) => {
         body: JSON.stringify(payload)
       });
     }
-    replaceEmployee(data.employee);
+
+    let employee = data.employee;
+    if (pendingPhotoFile) {
+      employee = await uploadEmployeePhoto(employee.id, pendingPhotoFile);
+    } else if (photoCleared && editingEmployeeId) {
+      const cleared = await api(`/api/employees/${employee.id}/photo`, { method: "DELETE" });
+      employee = cleared.employee;
+    }
+
+    resetPhotoPickerState();
+    replaceEmployee(employee);
     document.getElementById("employee-form").classList.add("hidden");
-    showStaffDetail(data.employee.id);
+    showStaffDetail(employee.id);
     tg.HapticFeedback?.notificationOccurred("success");
   } catch (err) {
     tg.showAlert(`${t("saveError")}: ${err.message}`);

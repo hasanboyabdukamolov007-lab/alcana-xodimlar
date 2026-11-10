@@ -1,4 +1,8 @@
-/** 11 required document checklist IDs (must match Mini App REQUIRED_DOCS). */
+/**
+ * Required document checklist IDs (must match Mini App REQUIRED_DOCS).
+ * Removed: no_criminal (Sudlanmaganligi haqida ma'lumotnoma)
+ * Added: nps, life_wheel, currency_pledge, illegal_info_pledge
+ */
 const DOC_IDS = [
   'personal_info',
   'application',
@@ -8,15 +12,21 @@ const DOC_IDS = [
   'company_form',
   'contract',
   'safety',
-  'no_criminal',
+  'nps',
+  'life_wheel',
+  'currency_pledge',
+  'illegal_info_pledge',
   'personality',
   'iq_test',
 ];
 
+/** Legacy IDs kept only for migration / old file rows. */
+const LEGACY_DOC_IDS = ['no_criminal'];
+
 function emptyDocuments() {
   const docs = {};
   for (const id of DOC_IDS) {
-    docs[id] = { present: false };
+    docs[id] = { present: false, files: [] };
   }
   return docs;
 }
@@ -25,4 +35,4 @@ function isValidDocId(docId) {
   return DOC_IDS.includes(docId);
 }
 
-module.exports = { DOC_IDS, emptyDocuments, isValidDocId };
+module.exports = { DOC_IDS, LEGACY_DOC_IDS, emptyDocuments, isValidDocId };
