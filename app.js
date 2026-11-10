@@ -55,7 +55,13 @@ const i18n = {
     sentToTelegram: "Telegramga yuborildi",
     telegramSendError: "Telegramga yuborib bo'lmadi",
     deleteConfirm: "Xodimni o'chirishni tasdiqlaysizmi?",
-    deleteFileConfirm: "Bu faylni o'chirasizmi?"
+    deleteFileConfirm: "Bu faylni o'chirasizmi?",
+    accessTitle: "Rahbar kirishi",
+    accessHint: "Mini App va ma'lumotlar uchun rahbar parolini kiriting.",
+    accessLabel: "Parol",
+    accessSubmit: "Kirish",
+    accessWrong: "Parol noto'g'ri",
+    accessNeeded: "Parol talab qilinadi"
   },
   ru: {
     title: "Документы сотрудников",
@@ -101,7 +107,13 @@ const i18n = {
     sentToTelegram: "Отправлено в Telegram",
     telegramSendError: "Не удалось отправить в Telegram",
     deleteConfirm: "Удалить сотрудника?",
-    deleteFileConfirm: "Удалить этот файл?"
+    deleteFileConfirm: "Удалить этот файл?",
+    accessTitle: "Вход для руководителей",
+    accessHint: "Введите пароль руководителя для доступа к Mini App.",
+    accessLabel: "Пароль",
+    accessSubmit: "Войти",
+    accessWrong: "Неверный пароль",
+    accessNeeded: "Требуется пароль"
   },
   en: {
     title: "Staff Documents",
@@ -147,7 +159,13 @@ const i18n = {
     sentToTelegram: "Sent to Telegram",
     telegramSendError: "Could not send to Telegram",
     deleteConfirm: "Delete this employee?",
-    deleteFileConfirm: "Delete this file?"
+    deleteFileConfirm: "Delete this file?",
+    accessTitle: "Leader access",
+    accessHint: "Enter the leader password to use the Mini App.",
+    accessLabel: "Password",
+    accessSubmit: "Unlock",
+    accessWrong: "Wrong password",
+    accessNeeded: "Password required"
   }
 };
 
@@ -156,13 +174,53 @@ function t(key) { return i18n[currentLang][key] || key; }
 
 const API_BASE = ""; // same origin on Vercel / local server
 const MAX_PHOTO_BYTES = 3.5 * 1024 * 1024;
+const ACCESS_STORAGE_KEY = "alcana_leader_access";
 let backendReady = false;
+let accessRequired = false;
 let staffMembers = [];
 let editingEmployeeId = null;
 /** @type {File|null} */
 let pendingPhotoFile = null;
 let photoCleared = false;
 let photoObjectUrl = null;
+
+function getStoredAccessPassword() {
+  try {
+    return sessionStorage.getItem(ACCESS_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setStoredAccessPassword(value) {
+  try {
+    if (value) sessionStorage.setItem(ACCESS_STORAGE_KEY, value);
+    else sessionStorage.removeItem(ACCESS_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function consumeAccessQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("access") || params.get("leader_password");
+  if (fromQuery) {
+    setStoredAccessPassword(fromQuery);
+    params.delete("access");
+    params.delete("leader_password");
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", next);
+  }
+}
+
+function withAccessQuery(url) {
+  const pwd = getStoredAccessPassword();
+  if (!accessRequired || !pwd) return url;
+  const abs = url.startsWith("http") ? url : `${window.location.origin}${url}`;
+  const u = new URL(abs);
+  u.searchParams.set("access", pwd);
+  return u.toString();
+}
 
 const DEMO_STAFF = [
   {
@@ -245,6 +303,8 @@ function authHeaders() {
   const params = new URLSearchParams(window.location.search);
   const admin = params.get("admin_token");
   if (admin) headers["X-Admin-Token"] = admin;
+  const leaderPwd = getStoredAccessPassword();
+  if (leaderPwd) headers["X-Leader-Password"] = leaderPwd;
   return headers;
 }
 
@@ -288,12 +348,36 @@ function setLang(lang) {
   updatePhotoPickLabel();
   document.getElementById("form-save").textContent = t("save");
   document.getElementById("form-cancel").textContent = t("cancel");
+  document.getElementById("access-title").textContent = t("accessTitle");
+  document.getElementById("access-hint").textContent = t("accessHint");
+  document.getElementById("label-access").textContent = t("accessLabel");
+  document.getElementById("access-submit").textContent = t("accessSubmit");
   updateStatusBadge();
   tg.MainButton.setText(t("addEmployee"));
   renderStaffList();
   if (!document.getElementById("staff-detail").classList.contains("hidden")) {
     const id = window.currentStaffId;
     if (id) showStaffDetail(id);
+  }
+}
+
+function showAccessGate(show, errorMsg = "") {
+  const gate = document.getElementById("access-gate");
+  const err = document.getElementById("access-error");
+  if (!gate) return;
+  gate.classList.toggle("hidden", !show);
+  if (err) {
+    if (errorMsg) {
+      err.textContent = errorMsg;
+      err.classList.remove("hidden");
+    } else {
+      err.textContent = "";
+      err.classList.add("hidden");
+    }
+  }
+  if (show) {
+    tg.MainButton.hide();
+    document.getElementById("input-access")?.focus();
   }
 }
 
@@ -340,9 +424,12 @@ function resetPhotoPickerState() {
 
 function employeePhotoSrc(emp) {
   if (!isRealPhoto(emp?.photo)) return "";
-  const src = emp.photo;
+  let src = emp.photo;
   if (src.startsWith("/api/") && emp.updatedAt) {
-    return `${src}${src.includes("?") ? "&" : "?"}t=${encodeURIComponent(emp.updatedAt)}`;
+    src = `${src}${src.includes("?") ? "&" : "?"}t=${encodeURIComponent(emp.updatedAt)}`;
+  }
+  if (src.startsWith("/api/")) {
+    return withAccessQuery(`${window.location.origin}${src}`);
   }
   return src;
 }
@@ -713,14 +800,16 @@ window.viewFile = function(staffId, docId, fileId) {
   if (!file) return;
 
   if (backendReady && file.id && file.id !== "legacy") {
-    const url = file.url || `/api/files/${staffId}/${docId}/${file.id}`;
-    if (tg.openLink) tg.openLink(url.startsWith("http") ? url : `${window.location.origin}${url}`);
+    const raw = file.url || `/api/files/${staffId}/${docId}/${file.id}`;
+    const url = withAccessQuery(raw.startsWith("http") ? raw : `${window.location.origin}${raw}`);
+    if (tg.openLink) tg.openLink(url);
     else window.open(url, "_blank");
     return;
   }
   if (backendReady) {
-    const url = file.url || `/api/files/${staffId}/${docId}`;
-    if (tg.openLink) tg.openLink(url.startsWith("http") ? url : `${window.location.origin}${url}`);
+    const raw = file.url || `/api/files/${staffId}/${docId}`;
+    const url = withAccessQuery(raw.startsWith("http") ? raw : `${window.location.origin}${raw}`);
+    if (tg.openLink) tg.openLink(url);
     else window.open(url, "_blank");
     return;
   }
@@ -914,23 +1003,80 @@ async function loadFromBackend() {
     const health = await api("/api/health");
     if (!health.ok || !health.backend) return false;
     backendReady = true;
-    const list = await api("/api/employees");
-    staffMembers = (list.employees || []).map(normalizeEmployee);
-    return true;
+    accessRequired = Boolean(health.accessRequired);
+    if (accessRequired && !getStoredAccessPassword()) {
+      return "need_access";
+    }
+    try {
+      const list = await api("/api/employees");
+      staffMembers = (list.employees || []).map(normalizeEmployee);
+      return true;
+    } catch (err) {
+      if (err.data?.code === "LEADER_PASSWORD_REQUIRED" || err.status === 401) {
+        accessRequired = true;
+        setStoredAccessPassword("");
+        return "need_access";
+      }
+      throw err;
+    }
   } catch {
     backendReady = false;
     return false;
   }
 }
 
+async function unlockWithPassword(password) {
+  setStoredAccessPassword(password);
+  try {
+    const list = await api("/api/employees");
+    staffMembers = (list.employees || []).map(normalizeEmployee);
+    showAccessGate(false);
+    updateStatusBadge();
+    renderStaffList();
+    if (backendReady) {
+      tg.MainButton.setText(t("addEmployee"));
+      tg.MainButton.show();
+      tg.MainButton.onClick(() => openEmployeeForm(null));
+    }
+    return true;
+  } catch (err) {
+    setStoredAccessPassword("");
+    showAccessGate(true, t("accessWrong"));
+    return false;
+  }
+}
+
+document.getElementById("access-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const pwd = document.getElementById("input-access").value.trim();
+  if (!pwd) {
+    showAccessGate(true, t("accessNeeded"));
+    return;
+  }
+  document.getElementById("access-submit").disabled = true;
+  try {
+    await unlockWithPassword(pwd);
+  } finally {
+    document.getElementById("access-submit").disabled = false;
+  }
+};
+
 async function init() {
+  consumeAccessQueryParam();
   document.getElementById("staff-cards").innerHTML = `<div class="empty-state">${t("loading")}</div>`;
+  setLang("uz");
   const ok = await loadFromBackend();
+  if (ok === "need_access") {
+    showAccessGate(true);
+    document.getElementById("staff-cards").innerHTML = `<div class="empty-state">${t("accessNeeded")}</div>`;
+    updateStatusBadge();
+    return;
+  }
   if (!ok) {
     staffMembers = DEMO_STAFF.map(normalizeEmployee);
   }
+  showAccessGate(false);
   updateStatusBadge();
-  setLang("uz");
   renderStaffList();
 
   tg.MainButton.setText(t("addEmployee"));

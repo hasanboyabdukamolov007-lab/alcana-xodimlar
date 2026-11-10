@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node scripts/local-server.js",
     "start": "node scripts/local-server.js",
-    "test:api": "node scripts/smoke-test.js"
+    "test:api": "node scripts/smoke-test.js",
+    "test:access": "node scripts/smoke-access-test.js"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

@@ -8,6 +8,19 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="access-gate" class="access-gate hidden" aria-live="polite">
+    <div class="access-gate-card">
+      <h2 id="access-title">Rahbar kirishi</h2>
+      <p id="access-hint" class="access-hint">Davom etish uchun parolni kiriting.</p>
+      <form id="access-form">
+        <label id="label-access" for="input-access">Parol</label>
+        <input id="input-access" type="password" autocomplete="current-password" required>
+        <button type="submit" id="access-submit" class="btn">Kirish</button>
+      </form>
+      <p id="access-error" class="access-error hidden"></p>
+    </div>
+  </div>
+
   <div id="app">
     <header>
       <div class="header-top">

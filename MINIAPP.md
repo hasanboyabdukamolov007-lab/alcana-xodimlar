@@ -34,6 +34,7 @@ Olib tashlangan: Sudlanmaganligi haqida ma'lumotnoma (`no_criminal`).
 - Xodim fotosi: qurilmadan yuklash (URL emas); yo‘q bo‘lsa initials
 - Yangi xodim qo‘shish / tahrirlash (backend ulanganida)
 - Telegram theme, haptic feedback, initData auth
+- Rahbar paroli (`LEADER_PASSWORD`) — gate ekrani; botda `/login`
 
 ## Qanday ishga tushirish
 
