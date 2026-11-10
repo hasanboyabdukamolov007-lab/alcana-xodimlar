@@ -3,7 +3,7 @@ tg.ready();
 tg.expand();
 
 // Theme
-Object.keys(tg.themeParams).forEach(key => {
+Object.keys(tg.themeParams || {}).forEach(key => {
   if (tg.themeParams[key]) {
     document.documentElement.style.setProperty(`--tg-theme-${key.replace(/_/g, '-')}`, tg.themeParams[key]);
   }
@@ -23,7 +23,25 @@ const i18n = {
     view: "Ko'rish",
     noFile: "Fayl yo'q",
     required: "Majburiy",
-    tests: "Test natijalari"
+    tests: "Test natijalari",
+    addEmployee: "Yangi xodim qo'shish",
+    editEmployee: "Tahrirlash",
+    save: "Saqlash",
+    cancel: "Bekor qilish",
+    name: "Ism familiya",
+    positionUz: "Lavozim (UZ)",
+    positionRu: "Lavozim (RU)",
+    positionEn: "Lavozim (EN)",
+    photoUrl: "Foto URL (ixtiyoriy)",
+    backendReady: "Backend ulangan",
+    demoMode: "Demo rejim",
+    loading: "Yuklanmoqda...",
+    empty: "Xodimlar yo'q. Yangi xodim qo'shing.",
+    saveError: "Saqlashda xato",
+    loadError: "Ma'lumot yuklanmadi",
+    nameRequired: "Ism majburiy",
+    uploaded: "Yuklandi",
+    deleteConfirm: "Xodimni o'chirishni tasdiqlaysizmi?"
   },
   ru: {
     title: "Документы сотрудников",
@@ -37,7 +55,25 @@ const i18n = {
     view: "Просмотр",
     noFile: "Нет файла",
     required: "Обязательно",
-    tests: "Результаты тестов"
+    tests: "Результаты тестов",
+    addEmployee: "Добавить сотрудника",
+    editEmployee: "Редактировать",
+    save: "Сохранить",
+    cancel: "Отмена",
+    name: "ФИО",
+    positionUz: "Должность (UZ)",
+    positionRu: "Должность (RU)",
+    positionEn: "Должность (EN)",
+    photoUrl: "URL фото (необязательно)",
+    backendReady: "Backend подключён",
+    demoMode: "Демо режим",
+    loading: "Загрузка...",
+    empty: "Нет сотрудников. Добавьте нового.",
+    saveError: "Ошибка сохранения",
+    loadError: "Не удалось загрузить данные",
+    nameRequired: "Имя обязательно",
+    uploaded: "Загружено",
+    deleteConfirm: "Удалить сотрудника?"
   },
   en: {
     title: "Staff Documents",
@@ -51,12 +87,110 @@ const i18n = {
     view: "View",
     noFile: "No file",
     required: "Required",
-    tests: "Test Results"
+    tests: "Test Results",
+    addEmployee: "Add employee",
+    editEmployee: "Edit",
+    save: "Save",
+    cancel: "Cancel",
+    name: "Full name",
+    positionUz: "Position (UZ)",
+    positionRu: "Position (RU)",
+    positionEn: "Position (EN)",
+    photoUrl: "Photo URL (optional)",
+    backendReady: "Backend connected",
+    demoMode: "Demo mode",
+    loading: "Loading...",
+    empty: "No employees yet. Add one.",
+    saveError: "Save failed",
+    loadError: "Failed to load data",
+    nameRequired: "Name is required",
+    uploaded: "Uploaded",
+    deleteConfirm: "Delete this employee?"
   }
 };
 
 let currentLang = "uz";
 function t(key) { return i18n[currentLang][key] || key; }
+
+const API_BASE = ""; // same origin on Vercel / local server
+let backendReady = false;
+let staffMembers = [];
+let editingEmployeeId = null;
+
+const DEMO_STAFF = [
+  {
+    id: "demo-1",
+    name: "Ali Karimov",
+    position: { uz: "Dasturchi", ru: "Программист", en: "Software Engineer" },
+    photo: "https://i.pravatar.cc/150?img=11",
+    documents: {
+      passport: { present: true, filename: "passport_ali.pdf", date: "2026-10-15" },
+      photo_3x4: { present: true, filename: "photos_ali.zip", date: "2026-09-01" },
+      contract: { present: true, filename: "contract_ali.pdf", date: "2026-08-20" },
+      personality: { present: true, filename: "16p_ali.pdf", date: "2026-11-05" },
+      iq_test: { present: false }
+    }
+  },
+  {
+    id: "demo-2",
+    name: "Malika Yusupova",
+    position: { uz: "HR menejer", ru: "HR менеджер", en: "HR Manager" },
+    photo: "https://i.pravatar.cc/150?img=5",
+    documents: {
+      passport: { present: true, filename: "passport_malika.pdf", date: "2026-11-01" },
+      photo_3x4: { present: true, filename: "photo_malika.jpg", date: "2026-11-01" },
+      contract: { present: false },
+      personality: { present: true, filename: "16p_malika.pdf", date: "2026-10-28" },
+      iq_test: { present: true, filename: "mensa_malika.pdf", date: "2026-10-30" }
+    }
+  },
+  {
+    id: "demo-3",
+    name: "Jasur Abdullaev",
+    position: { uz: "Buxgalter", ru: "Бухгалтер", en: "Accountant" },
+    photo: "https://i.pravatar.cc/150?img=12",
+    documents: {
+      passport: { present: false },
+      photo_3x4: { present: true, filename: "photo_jasur.jpg", date: "2026-09-15" },
+      personality: { present: false },
+      iq_test: { present: false }
+    }
+  }
+];
+
+function authHeaders() {
+  const headers = {};
+  const initData = tg.initData || "";
+  if (initData) {
+    headers["X-Telegram-Init-Data"] = initData;
+  }
+  // Optional local/admin testing: ?admin_token=... (do not use in production bookmarks)
+  const params = new URLSearchParams(window.location.search);
+  const admin = params.get("admin_token");
+  if (admin) headers["X-Admin-Token"] = admin;
+  return headers;
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...authHeaders(),
+      ...(options.headers || {})
+    }
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
 
 function setLang(lang) {
   currentLang = lang;
@@ -66,6 +200,16 @@ function setLang(lang) {
   document.getElementById("app-title").textContent = t("title");
   document.getElementById("search-input").placeholder = t("search");
   document.getElementById("back-btn").textContent = t("back");
+  document.getElementById("form-title").textContent = editingEmployeeId ? t("editEmployee") : t("addEmployee");
+  document.getElementById("label-name").textContent = t("name");
+  document.getElementById("label-pos-uz").textContent = t("positionUz");
+  document.getElementById("label-pos-ru").textContent = t("positionRu");
+  document.getElementById("label-pos-en").textContent = t("positionEn");
+  document.getElementById("label-photo").textContent = t("photoUrl");
+  document.getElementById("form-save").textContent = t("save");
+  document.getElementById("form-cancel").textContent = t("cancel");
+  updateStatusBadge();
+  tg.MainButton.setText(t("addEmployee"));
   renderStaffList();
   if (!document.getElementById("staff-detail").classList.contains("hidden")) {
     const id = window.currentStaffId;
@@ -92,47 +236,31 @@ const REQUIRED_DOCS = [
   { id: "iq_test", names: { uz: "Mensa IQ test natijasi", ru: "Результат теста Mensa IQ", en: "Mensa IQ Test Result" }, desc: { uz: "IQ testi natijasi", ru: "Результат IQ теста", en: "IQ test result" } }
 ];
 
-// Sample staff
-let staffMembers = [
-  {
-    id: 1,
-    name: "Ali Karimov",
-    position: { uz: "Dasturchi", ru: "Программист", en: "Software Engineer" },
-    photo: "https://i.pravatar.cc/150?img=11",
-    documents: {
-      passport: { present: true, filename: "passport_ali.pdf", date: "2026-10-15" },
-      photo_3x4: { present: true, filename: "photos_ali.zip", date: "2026-09-01" },
-      contract: { present: true, filename: "contract_ali.pdf", date: "2026-08-20" },
-      personality: { present: true, filename: "16p_ali.pdf", date: "2026-11-05" },
-      iq_test: { present: false }
-    }
-  },
-  {
-    id: 2,
-    name: "Malika Yusupova",
-    position: { uz: "HR menejer", ru: "HR менеджер", en: "HR Manager" },
-    photo: "https://i.pravatar.cc/150?img=5",
-    documents: {
-      passport: { present: true, filename: "passport_malika.pdf", date: "2026-11-01" },
-      photo_3x4: { present: true, filename: "photo_malika.jpg", date: "2026-11-01" },
-      contract: { present: false },
-      personality: { present: true, filename: "16p_malika.pdf", date: "2026-10-28" },
-      iq_test: { present: true, filename: "mensa_malika.pdf", date: "2026-10-30" }
-    }
-  },
-  {
-    id: 3,
-    name: "Jasur Abdullaev",
-    position: { uz: "Buxgalter", ru: "Бухгалтер", en: "Accountant" },
-    photo: "https://i.pravatar.cc/150?img=12",
-    documents: {
-      passport: { present: false },
-      photo_3x4: { present: true, filename: "photo_jasur.jpg", date: "2026-09-15" },
-      personality: { present: false },
-      iq_test: { present: false }
-    }
-  }
-];
+function normalizeEmployee(raw) {
+  const documents = {};
+  REQUIRED_DOCS.forEach(doc => {
+    documents[doc.id] = raw.documents?.[doc.id] || { present: false };
+  });
+  return {
+    id: raw.id,
+    name: raw.name,
+    position: {
+      uz: raw.position?.uz || "",
+      ru: raw.position?.ru || "",
+      en: raw.position?.en || ""
+    },
+    photo: raw.photo || "https://i.pravatar.cc/150?u=" + encodeURIComponent(raw.id || raw.name),
+    documents
+  };
+}
+
+function updateStatusBadge() {
+  const el = document.getElementById("user-info");
+  const user = tg.initDataUnsafe?.user;
+  const who = user ? `${user.first_name} ${user.last_name || ""}`.trim() : "";
+  const mode = backendReady ? t("backendReady") : t("demoMode");
+  el.textContent = who ? `${who} · ${mode}` : mode;
+}
 
 function calculateProgress(staff) {
   const total = REQUIRED_DOCS.length;
@@ -145,28 +273,40 @@ function renderStaffList() {
   const container = document.getElementById("staff-cards");
   container.innerHTML = "";
 
-  staffMembers
-    .filter(s => s.name.toLowerCase().includes(query))
-    .forEach(staff => {
-      const p = calculateProgress(staff);
-      const complete = p.percent === 100;
-      const card = document.createElement("div");
-      card.className = "staff-card";
-      card.onclick = () => showStaffDetail(staff.id);
-      card.innerHTML = `
-        <img class="avatar" src="${staff.photo}" alt="">
-        <div class="staff-info">
-          <div class="staff-name">${staff.name}</div>
-          <div style="font-size:0.82rem;color:var(--tg-theme-hint-color)">${staff.position[currentLang]}</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${p.percent}%"></div></div>
-          <div class="progress-text">
-            <span>${p.completed}/${p.total} ${t("verified")}</span>
-            <span class="status-badge ${complete ? "status-complete" : "status-incomplete"}">${complete ? t("complete") : t("incomplete")}</span>
-          </div>
+  const filtered = staffMembers.filter(s => s.name.toLowerCase().includes(query));
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state">${t("empty")}</div>`;
+    return;
+  }
+
+  filtered.forEach(staff => {
+    const p = calculateProgress(staff);
+    const complete = p.percent === 100;
+    const card = document.createElement("div");
+    card.className = "staff-card";
+    card.onclick = () => showStaffDetail(staff.id);
+    card.innerHTML = `
+      <img class="avatar" src="${staff.photo}" alt="" onerror="this.src='https://i.pravatar.cc/150?u=${encodeURIComponent(staff.id)}'">
+      <div class="staff-info">
+        <div class="staff-name">${escapeHtml(staff.name)}</div>
+        <div style="font-size:0.82rem;color:var(--tg-theme-hint-color)">${escapeHtml(staff.position[currentLang] || "")}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${p.percent}%"></div></div>
+        <div class="progress-text">
+          <span>${p.completed}/${p.total} ${t("verified")}</span>
+          <span class="status-badge ${complete ? "status-complete" : "status-incomplete"}">${complete ? t("complete") : t("incomplete")}</span>
         </div>
-      `;
-      container.appendChild(card);
-    });
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function showStaffDetail(id) {
@@ -176,14 +316,17 @@ function showStaffDetail(id) {
 
   document.getElementById("staff-list").classList.add("hidden");
   document.getElementById("staff-detail").classList.remove("hidden");
+  document.getElementById("employee-form").classList.add("hidden");
+  tg.MainButton.hide();
 
   const p = calculateProgress(staff);
   let html = `
     <div style="text-align:center;margin-bottom:16px;">
-      <img class="avatar" src="${staff.photo}" style="width:80px;height:80px;">
-      <h2 style="margin:8px 0 4px;">${staff.name}</h2>
-      <div style="color:var(--tg-theme-hint-color)">${staff.position[currentLang]}</div>
+      <img class="avatar" src="${staff.photo}" style="width:80px;height:80px;" onerror="this.src='https://i.pravatar.cc/150?u=${encodeURIComponent(staff.id)}'">
+      <h2 style="margin:8px 0 4px;">${escapeHtml(staff.name)}</h2>
+      <div style="color:var(--tg-theme-hint-color)">${escapeHtml(staff.position[currentLang] || "")}</div>
       <div style="margin-top:8px;font-weight:600;">${p.completed}/${p.total} ${t("verified")}</div>
+      ${backendReady ? `<button class="btn btn-secondary" style="margin-top:10px;" onclick="openEmployeeForm('${staff.id}')">${t("editEmployee")}</button>` : ""}
     </div>
     <h3 style="margin-bottom:8px;">${t("documents")}</h3>
   `;
@@ -191,18 +334,19 @@ function showStaffDetail(id) {
   REQUIRED_DOCS.forEach(doc => {
     const data = staff.documents[doc.id] || { present: false };
     const checked = data.present;
+    const canView = checked && (data.url || data.hasFile || data.filename);
     html += `
       <div class="doc-item">
-        <div class="checkbox ${checked ? "checked" : ""}" onclick="toggleDoc(${id}, '${doc.id}')">${checked ? "✓" : ""}</div>
+        <div class="checkbox ${checked ? "checked" : ""}" onclick="toggleDoc('${id}', '${doc.id}')">${checked ? "✓" : ""}</div>
         <div class="doc-content">
           <div class="doc-name">${doc.names[currentLang]}</div>
           <div class="doc-desc">${doc.desc[currentLang]}</div>
-          <div class="file-info">${data.filename ? `📄 ${data.filename} • ${data.date || ""}` : t("noFile")}</div>
+          <div class="file-info">${data.filename ? `📄 ${escapeHtml(data.filename)} • ${data.date || ""}` : t("noFile")}</div>
         </div>
         <div class="actions">
-          ${checked && data.filename
-            ? `<button class="view-btn" onclick="viewDoc('${data.filename}')">${t("view")}</button>`
-            : `<button class="upload-btn" onclick="uploadDoc(${id}, '${doc.id}')">${t("upload")}</button>`}
+          ${canView
+            ? `<button class="view-btn" onclick="viewDoc('${id}', '${doc.id}')">${t("view")}</button>`
+            : `<button class="upload-btn" onclick="uploadDoc('${id}', '${doc.id}')">${t("upload")}</button>`}
         </div>
       </div>
     `;
@@ -213,57 +357,227 @@ function showStaffDetail(id) {
 
 document.getElementById("back-btn").onclick = () => {
   document.getElementById("staff-detail").classList.add("hidden");
+  document.getElementById("employee-form").classList.add("hidden");
   document.getElementById("staff-list").classList.remove("hidden");
+  if (backendReady) tg.MainButton.show();
   renderStaffList();
 };
 
 document.getElementById("search-input").oninput = renderStaffList;
 
-window.toggleDoc = function(staffId, docId) {
+window.toggleDoc = async function(staffId, docId) {
   const staff = staffMembers.find(s => s.id === staffId);
+  if (!staff) return;
   if (!staff.documents[docId]) staff.documents[docId] = { present: false };
-  staff.documents[docId].present = !staff.documents[docId].present;
-  if (!staff.documents[docId].present) {
-    delete staff.documents[docId].filename;
-    delete staff.documents[docId].date;
+  const next = !staff.documents[docId].present;
+
+  if (backendReady) {
+    try {
+      const data = await api(`/api/employees/${staffId}/docs/${docId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ present: next })
+      });
+      replaceEmployee(data.employee);
+    } catch (err) {
+      tg.showAlert(`${t("saveError")}: ${err.message}`);
+      return;
+    }
+  } else {
+    staff.documents[docId].present = next;
+    if (!next) {
+      delete staff.documents[docId].filename;
+      delete staff.documents[docId].date;
+    }
   }
   showStaffDetail(staffId);
-  tg.HapticFeedback.impactOccurred("light");
+  tg.HapticFeedback?.impactOccurred("light");
 };
 
 window.uploadDoc = function(staffId, docId) {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip";
-  input.onchange = e => {
+  input.onchange = async e => {
     const file = e.target.files[0];
     if (!file) return;
     const staff = staffMembers.find(s => s.id === staffId);
+    if (!staff) return;
+
+    if (backendReady) {
+      try {
+        const base64 = await fileToBase64(file);
+        const data = await api(`/api/employees/${staffId}/docs/${docId}`, {
+          method: "POST",
+          body: JSON.stringify({
+            filename: file.name,
+            mimeType: file.type || "application/octet-stream",
+            data: base64
+          })
+        });
+        replaceEmployee(data.employee);
+        showStaffDetail(staffId);
+        tg.showAlert(`${t("uploaded")}: ${file.name}`);
+      } catch (err) {
+        tg.showAlert(`${t("saveError")}: ${err.message}`);
+      }
+      return;
+    }
+
     staff.documents[docId] = {
       present: true,
       filename: file.name,
       date: new Date().toISOString().split("T")[0]
     };
     showStaffDetail(staffId);
-    tg.showAlert(`Yuklandi: ${file.name}`);
+    tg.showAlert(`${t("uploaded")}: ${file.name}`);
   };
   input.click();
 };
 
-window.viewDoc = function(filename) {
-  tg.showAlert(`Hujjat: ${filename}\n\nHaqiqiy ilovada bu yerda ochiladi yoki yuklab olinadi.`);
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const idx = result.indexOf(",");
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+window.viewDoc = function(staffId, docId) {
+  const staff = staffMembers.find(s => s.id === staffId);
+  const data = staff?.documents?.[docId];
+  if (!data) return;
+
+  if (backendReady && (data.hasFile || data.url || data.filename)) {
+    const url = data.url || `/api/files/${staffId}/${docId}`;
+    if (tg.openLink) tg.openLink(url.startsWith("http") ? url : `${window.location.origin}${url}`);
+    else window.open(url, "_blank");
+    return;
+  }
+  tg.showAlert(`Hujjat: ${data.filename || docId}`);
 };
 
-// User info
-const user = tg.initDataUnsafe?.user;
-document.getElementById("user-info").textContent = user
-  ? `${user.first_name} ${user.last_name || ""}`
-  : "Demo rejim";
+function replaceEmployee(raw) {
+  const normalized = normalizeEmployee(raw);
+  const idx = staffMembers.findIndex(s => s.id === normalized.id);
+  if (idx >= 0) staffMembers[idx] = normalized;
+  else staffMembers.push(normalized);
+}
 
-// Init
-setLang("uz");
-renderStaffList();
+window.openEmployeeForm = function(id) {
+  if (!backendReady) {
+    tg.showAlert("Yangi xodim qo'shish formasi ochiladi (backend kerak)");
+    return;
+  }
+  editingEmployeeId = id || null;
+  document.getElementById("staff-list").classList.add("hidden");
+  document.getElementById("staff-detail").classList.add("hidden");
+  document.getElementById("employee-form").classList.remove("hidden");
+  tg.MainButton.hide();
 
-tg.MainButton.setText("Yangi xodim qo'shish");
-tg.MainButton.show();
-tg.MainButton.onClick(() => tg.showAlert("Yangi xodim qo'shish formasi ochiladi (backend kerak)"));
+  document.getElementById("form-title").textContent = editingEmployeeId ? t("editEmployee") : t("addEmployee");
+  const emp = editingEmployeeId ? staffMembers.find(s => s.id === editingEmployeeId) : null;
+  document.getElementById("input-name").value = emp?.name || "";
+  document.getElementById("input-pos-uz").value = emp?.position?.uz || "";
+  document.getElementById("input-pos-ru").value = emp?.position?.ru || "";
+  document.getElementById("input-pos-en").value = emp?.position?.en || "";
+  document.getElementById("input-photo").value = emp?.photo && !emp.photo.includes("pravatar") ? emp.photo : "";
+};
+
+document.getElementById("form-cancel").onclick = () => {
+  document.getElementById("employee-form").classList.add("hidden");
+  if (editingEmployeeId) {
+    showStaffDetail(editingEmployeeId);
+  } else {
+    document.getElementById("staff-list").classList.remove("hidden");
+    tg.MainButton.show();
+  }
+};
+
+document.getElementById("employee-form-el").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!backendReady) return;
+
+  const name = document.getElementById("input-name").value.trim();
+  if (!name) {
+    tg.showAlert(t("nameRequired"));
+    return;
+  }
+
+  const payload = {
+    name,
+    position: {
+      uz: document.getElementById("input-pos-uz").value.trim(),
+      ru: document.getElementById("input-pos-ru").value.trim(),
+      en: document.getElementById("input-pos-en").value.trim()
+    },
+    photo: document.getElementById("input-photo").value.trim()
+  };
+
+  const saveBtn = document.getElementById("form-save");
+  saveBtn.disabled = true;
+  try {
+    let data;
+    if (editingEmployeeId) {
+      data = await api(`/api/employees/${editingEmployeeId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+    } else {
+      data = await api("/api/employees", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    }
+    replaceEmployee(data.employee);
+    document.getElementById("employee-form").classList.add("hidden");
+    showStaffDetail(data.employee.id);
+    tg.HapticFeedback?.notificationOccurred("success");
+  } catch (err) {
+    tg.showAlert(`${t("saveError")}: ${err.message}`);
+  } finally {
+    saveBtn.disabled = false;
+  }
+};
+
+async function loadFromBackend() {
+  try {
+    const health = await api("/api/health");
+    if (!health.ok || !health.backend) return false;
+    backendReady = true;
+    const list = await api("/api/employees");
+    staffMembers = (list.employees || []).map(normalizeEmployee);
+    return true;
+  } catch {
+    backendReady = false;
+    return false;
+  }
+}
+
+async function init() {
+  document.getElementById("staff-cards").innerHTML = `<div class="empty-state">${t("loading")}</div>`;
+  const ok = await loadFromBackend();
+  if (!ok) {
+    staffMembers = DEMO_STAFF.map(normalizeEmployee);
+  }
+  updateStatusBadge();
+  setLang("uz");
+  renderStaffList();
+
+  tg.MainButton.setText(t("addEmployee"));
+  if (backendReady) {
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => openEmployeeForm(null));
+  } else {
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => {
+      tg.showAlert("Yangi xodim qo'shish formasi ochiladi (backend kerak)");
+    });
+  }
+}
+
+init();

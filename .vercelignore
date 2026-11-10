@@ -1,3 +1,11 @@
 bot/
 staff-docs-ready.tar.gz
 .git/
+data/
+scripts/
+.env
+.env.*
+!.env.example
+node_modules/
+*.db
+

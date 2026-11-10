@@ -93,3 +93,41 @@ h1 { font-size: 1.35rem; font-weight: 700; }
 }
 .hidden { display: none; }
 .progress-text { font-size: 0.75rem; margin-top: 4px; display: flex; justify-content: space-between; }
+
+.empty-state {
+  text-align: center;
+  color: var(--tg-theme-hint-color);
+  padding: 28px 12px;
+  font-size: 0.95rem;
+}
+
+#employee-form h2 {
+  font-size: 1.2rem;
+  margin-bottom: 14px;
+}
+#employee-form label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 10px 0 4px;
+}
+#employee-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: var(--tg-theme-secondary-bg-color);
+  font-size: 1rem;
+  color: var(--tg-theme-text-color);
+}
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.form-actions .btn { flex: 1; margin-bottom: 0; }
+.btn-secondary {
+  background: var(--tg-theme-secondary-bg-color);
+  color: var(--tg-theme-text-color);
+}
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
