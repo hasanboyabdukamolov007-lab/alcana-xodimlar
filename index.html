@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Xodimlar Hujjatlari</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="header-top">
+        <h1 id="app-title">Xodimlar Hujjatlari</h1>
+        <div class="lang-switcher">
+          <button data-lang="uz" class="lang-btn active">UZ</button>
+          <button data-lang="ru" class="lang-btn">RU</button>
+          <button data-lang="en" class="lang-btn">EN</button>
+        </div>
+      </div>
+      <div id="user-info"></div>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Xodim qidirish...">
+      </div>
+    </header>
+
+    <section id="staff-list">
+      <div id="staff-cards"></div>
+    </section>
+
+    <section id="staff-detail" class="hidden">
+      <button id="back-btn" class="btn">← Orqaga</button>
+      <div id="detail-content"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
