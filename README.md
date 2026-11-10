@@ -122,8 +122,8 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 | GET | `/api/employees/:id` | no | One employee |
 | PUT | `/api/employees/:id` | write | Update employee |
 | DELETE | `/api/employees/:id` | write | Delete employee |
-| PATCH | `/api/employees/:id/docs/:docId` | write | `{ "present": true/false }` |
-| POST | `/api/employees/:id/docs/:docId` | write | Upload `{ filename, mimeType, data(base64) }` |
+| PATCH | `/api/employees/:id/docs/:docId` | write | `{ "present": true/false }` — `present: true` requires an uploaded file (`FILE_REQUIRED` otherwise) |
+| POST | `/api/employees/:id/docs/:docId` | write | Upload `{ filename, mimeType, data(base64) }` (marks doc complete) |
 | GET | `/api/files/:employeeId/:docId` | no | Download / redirect to blob |
 
 ## Redeploy checklist (foydalanuvchi uchun)

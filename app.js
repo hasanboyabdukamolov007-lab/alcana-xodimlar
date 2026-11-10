@@ -22,6 +22,7 @@ const i18n = {
     upload: "Yuklash",
     view: "Ko'rish",
     noFile: "Fayl yo'q",
+    fileRequired: "Avval fayl yuklang. Faylsiz belgilash mumkin emas.",
     required: "Majburiy",
     tests: "Test natijalari",
     addEmployee: "Yangi xodim qo'shish",
@@ -54,6 +55,7 @@ const i18n = {
     upload: "Загрузить",
     view: "Просмотр",
     noFile: "Нет файла",
+    fileRequired: "Сначала загрузите файл. Без файла отметить нельзя.",
     required: "Обязательно",
     tests: "Результаты тестов",
     addEmployee: "Добавить сотрудника",
@@ -86,6 +88,7 @@ const i18n = {
     upload: "Upload",
     view: "View",
     noFile: "No file",
+    fileRequired: "Upload a file first. Cannot mark complete without a file.",
     required: "Required",
     tests: "Test Results",
     addEmployee: "Add employee",
@@ -122,12 +125,12 @@ const DEMO_STAFF = [
     id: "demo-1",
     name: "Ali Karimov",
     position: { uz: "Dasturchi", ru: "Программист", en: "Software Engineer" },
-    photo: "https://i.pravatar.cc/150?img=11",
+    photo: "",
     documents: {
-      passport: { present: true, filename: "passport_ali.pdf", date: "2026-10-15" },
-      photo_3x4: { present: true, filename: "photos_ali.zip", date: "2026-09-01" },
-      contract: { present: true, filename: "contract_ali.pdf", date: "2026-08-20" },
-      personality: { present: true, filename: "16p_ali.pdf", date: "2026-11-05" },
+      passport: { present: true, filename: "passport_ali.pdf", date: "2026-10-15", hasFile: true },
+      photo_3x4: { present: true, filename: "photos_ali.zip", date: "2026-09-01", hasFile: true },
+      contract: { present: true, filename: "contract_ali.pdf", date: "2026-08-20", hasFile: true },
+      personality: { present: true, filename: "16p_ali.pdf", date: "2026-11-05", hasFile: true },
       iq_test: { present: false }
     }
   },
@@ -135,23 +138,23 @@ const DEMO_STAFF = [
     id: "demo-2",
     name: "Malika Yusupova",
     position: { uz: "HR menejer", ru: "HR менеджер", en: "HR Manager" },
-    photo: "https://i.pravatar.cc/150?img=5",
+    photo: "",
     documents: {
-      passport: { present: true, filename: "passport_malika.pdf", date: "2026-11-01" },
-      photo_3x4: { present: true, filename: "photo_malika.jpg", date: "2026-11-01" },
+      passport: { present: true, filename: "passport_malika.pdf", date: "2026-11-01", hasFile: true },
+      photo_3x4: { present: true, filename: "photo_malika.jpg", date: "2026-11-01", hasFile: true },
       contract: { present: false },
-      personality: { present: true, filename: "16p_malika.pdf", date: "2026-10-28" },
-      iq_test: { present: true, filename: "mensa_malika.pdf", date: "2026-10-30" }
+      personality: { present: true, filename: "16p_malika.pdf", date: "2026-10-28", hasFile: true },
+      iq_test: { present: true, filename: "mensa_malika.pdf", date: "2026-10-30", hasFile: true }
     }
   },
   {
     id: "demo-3",
     name: "Jasur Abdullaev",
     position: { uz: "Buxgalter", ru: "Бухгалтер", en: "Accountant" },
-    photo: "https://i.pravatar.cc/150?img=12",
+    photo: "",
     documents: {
       passport: { present: false },
-      photo_3x4: { present: true, filename: "photo_jasur.jpg", date: "2026-09-15" },
+      photo_3x4: { present: true, filename: "photo_jasur.jpg", date: "2026-09-15", hasFile: true },
       personality: { present: false },
       iq_test: { present: false }
     }
@@ -236,10 +239,58 @@ const REQUIRED_DOCS = [
   { id: "iq_test", names: { uz: "Mensa IQ test natijasi", ru: "Результат теста Mensa IQ", en: "Mensa IQ Test Result" }, desc: { uz: "IQ testi natijasi", ru: "Результат IQ теста", en: "IQ test result" } }
 ];
 
+function isRealPhoto(photo) {
+  if (!photo || typeof photo !== "string") return false;
+  const p = photo.trim();
+  if (!p) return false;
+  if (/pravatar\.cc/i.test(p)) return false;
+  return true;
+}
+
+function initialsFromName(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function hasDocFile(data) {
+  if (!data) return false;
+  return Boolean(data.hasFile || data.url || data.filename);
+}
+
+function isDocComplete(data) {
+  // Confirmed only when a file exists (upload auto-marks present).
+  return hasDocFile(data);
+}
+
+function avatarHtml(staff, extraStyle = "") {
+  const styleAttr = extraStyle ? ` style="${extraStyle}"` : "";
+  const initials = escapeHtml(initialsFromName(staff.name));
+  if (isRealPhoto(staff.photo)) {
+    return `<img class="avatar" src="${escapeHtml(staff.photo)}" alt=""${styleAttr} onerror="replaceBrokenAvatar(this,'${initials}')">`;
+  }
+  return `<div class="avatar avatar-initials"${styleAttr} aria-hidden="true">${initials}</div>`;
+}
+
+window.replaceBrokenAvatar = function(img, initials) {
+  const div = document.createElement("div");
+  div.className = "avatar avatar-initials";
+  div.textContent = initials || "?";
+  if (img.getAttribute("style")) div.setAttribute("style", img.getAttribute("style"));
+  img.replaceWith(div);
+};
+
 function normalizeEmployee(raw) {
   const documents = {};
   REQUIRED_DOCS.forEach(doc => {
-    documents[doc.id] = raw.documents?.[doc.id] || { present: false };
+    const src = raw.documents?.[doc.id] || { present: false };
+    const complete = isDocComplete(src);
+    documents[doc.id] = {
+      ...src,
+      present: complete,
+      hasFile: complete
+    };
   });
   return {
     id: raw.id,
@@ -249,7 +300,7 @@ function normalizeEmployee(raw) {
       ru: raw.position?.ru || "",
       en: raw.position?.en || ""
     },
-    photo: raw.photo || "https://i.pravatar.cc/150?u=" + encodeURIComponent(raw.id || raw.name),
+    photo: isRealPhoto(raw.photo) ? raw.photo.trim() : "",
     documents
   };
 }
@@ -264,7 +315,7 @@ function updateStatusBadge() {
 
 function calculateProgress(staff) {
   const total = REQUIRED_DOCS.length;
-  const completed = REQUIRED_DOCS.filter(doc => staff.documents[doc.id]?.present).length;
+  const completed = REQUIRED_DOCS.filter(doc => isDocComplete(staff.documents[doc.id])).length;
   return { completed, total, percent: Math.round((completed / total) * 100) };
 }
 
@@ -286,7 +337,7 @@ function renderStaffList() {
     card.className = "staff-card";
     card.onclick = () => showStaffDetail(staff.id);
     card.innerHTML = `
-      <img class="avatar" src="${staff.photo}" alt="" onerror="this.src='https://i.pravatar.cc/150?u=${encodeURIComponent(staff.id)}'">
+      ${avatarHtml(staff)}
       <div class="staff-info">
         <div class="staff-name">${escapeHtml(staff.name)}</div>
         <div style="font-size:0.82rem;color:var(--tg-theme-hint-color)">${escapeHtml(staff.position[currentLang] || "")}</div>
@@ -322,7 +373,7 @@ function showStaffDetail(id) {
   const p = calculateProgress(staff);
   let html = `
     <div style="text-align:center;margin-bottom:16px;">
-      <img class="avatar" src="${staff.photo}" style="width:80px;height:80px;" onerror="this.src='https://i.pravatar.cc/150?u=${encodeURIComponent(staff.id)}'">
+      ${avatarHtml(staff, "width:80px;height:80px;font-size:1.6rem;")}
       <h2 style="margin:8px 0 4px;">${escapeHtml(staff.name)}</h2>
       <div style="color:var(--tg-theme-hint-color)">${escapeHtml(staff.position[currentLang] || "")}</div>
       <div style="margin-top:8px;font-weight:600;">${p.completed}/${p.total} ${t("verified")}</div>
@@ -333,8 +384,8 @@ function showStaffDetail(id) {
 
   REQUIRED_DOCS.forEach(doc => {
     const data = staff.documents[doc.id] || { present: false };
-    const checked = data.present;
-    const canView = checked && (data.url || data.hasFile || data.filename);
+    const checked = isDocComplete(data);
+    const canView = checked;
     html += `
       <div class="doc-item">
         <div class="checkbox ${checked ? "checked" : ""}" onclick="toggleDoc('${id}', '${doc.id}')">${checked ? "✓" : ""}</div>
@@ -369,7 +420,15 @@ window.toggleDoc = async function(staffId, docId) {
   const staff = staffMembers.find(s => s.id === staffId);
   if (!staff) return;
   if (!staff.documents[docId]) staff.documents[docId] = { present: false };
-  const next = !staff.documents[docId].present;
+  const currentlyComplete = isDocComplete(staff.documents[docId]);
+  const next = !currentlyComplete;
+
+  // Completing without a file is not allowed — warn and keep unchecked.
+  if (next && !hasDocFile(staff.documents[docId])) {
+    tg.showAlert(t("fileRequired"));
+    tg.HapticFeedback?.notificationOccurred?.("error");
+    return;
+  }
 
   if (backendReady) {
     try {
@@ -379,14 +438,20 @@ window.toggleDoc = async function(staffId, docId) {
       });
       replaceEmployee(data.employee);
     } catch (err) {
-      tg.showAlert(`${t("saveError")}: ${err.message}`);
+      const msg = err.message || "";
+      if (err.data?.code === "FILE_REQUIRED" || /file required/i.test(msg)) {
+        tg.showAlert(t("fileRequired"));
+      } else {
+        tg.showAlert(`${t("saveError")}: ${msg}`);
+      }
       return;
     }
   } else {
-    staff.documents[docId].present = next;
     if (!next) {
-      delete staff.documents[docId].filename;
-      delete staff.documents[docId].date;
+      staff.documents[docId] = { present: false };
+    } else {
+      staff.documents[docId].present = true;
+      staff.documents[docId].hasFile = true;
     }
   }
   showStaffDetail(staffId);
@@ -485,7 +550,7 @@ window.openEmployeeForm = function(id) {
   document.getElementById("input-pos-uz").value = emp?.position?.uz || "";
   document.getElementById("input-pos-ru").value = emp?.position?.ru || "";
   document.getElementById("input-pos-en").value = emp?.position?.en || "";
-  document.getElementById("input-photo").value = emp?.photo && !emp.photo.includes("pravatar") ? emp.photo : "";
+  document.getElementById("input-photo").value = isRealPhoto(emp?.photo) ? emp.photo : "";
 };
 
 document.getElementById("form-cancel").onclick = () => {

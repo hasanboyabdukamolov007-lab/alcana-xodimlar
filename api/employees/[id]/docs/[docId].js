@@ -56,9 +56,19 @@ module.exports = async function handler(req, res) {
       if (typeof body.present !== 'boolean') {
         return sendJson(res, 400, { error: 'present (boolean) is required' });
       }
-      const employee = await setDocumentPresent(id, docId, body.present);
-      if (!employee) return sendJson(res, 404, { error: 'Employee not found' });
-      return sendJson(res, 200, { employee });
+      try {
+        const employee = await setDocumentPresent(id, docId, body.present);
+        if (!employee) return sendJson(res, 404, { error: 'Employee not found' });
+        return sendJson(res, 200, { employee });
+      } catch (err) {
+        if (err.code === 'FILE_REQUIRED' || err.statusCode === 400) {
+          return sendJson(res, 400, {
+            error: err.message || 'File required before marking document present',
+            code: 'FILE_REQUIRED',
+          });
+        }
+        throw err;
+      }
     }
 
     if (req.method === 'POST') {

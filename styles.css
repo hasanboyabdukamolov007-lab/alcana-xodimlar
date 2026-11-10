@@ -59,6 +59,18 @@ h1 { font-size: 1.35rem; font-weight: 700; }
 .staff-card:active { opacity: 0.85; }
 .avatar {
   width: 54px; height: 54px; border-radius: 50%; object-fit: cover; background: #ddd;
+  flex-shrink: 0;
+}
+.avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #c5ccd6;
+  color: #1c1c1e;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  user-select: none;
 }
 .staff-info { flex: 1; }
 .staff-name { font-weight: 600; font-size: 1.05rem; }
