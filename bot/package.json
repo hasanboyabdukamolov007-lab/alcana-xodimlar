@@ -2,6 +2,9 @@
   "name": "staff-docs-bot",
   "version": "1.0.0",
   "main": "bot.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node bot.js"
   },
