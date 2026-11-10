@@ -24,13 +24,24 @@ Vercel → Project → **Settings → Environment Variables** (Production + Prev
 |---|---|---|
 | `TURSO_DATABASE_URL` | **Yes (prod)** | Turso libSQL URL, e.g. `libsql://…turso.io` |
 | `TURSO_AUTH_TOKEN` | **Yes (prod)** | Turso auth token |
-| `BOT_TOKEN` | Recommended | Same token as the Telegram bot — validates WebApp `initData` on writes **and** powers «Telegramga saqlash» (`sendDocument`) |
-| `ADMIN_API_TOKEN` | Optional | Shared secret for scripts/admin (`X-Admin-Token` header) |
+| `BOT_TOKEN` | **Yes for «Telegramga saqlash»** | Same BotFather token as `@alcanastaffdata_bot` (and `bot/.env`). Validates Mini App `initData` **and** sends files via Bot API. **`bot/.env` alone does not set this.** |
+| `ADMIN_API_TOKEN` | Optional | Shared secret for scripts/admin (`X-Admin-Token` header); bot `/add` `/delete` need the same value in `bot/.env` |
 | `BLOB_READ_WRITE_TOKEN` | Optional | Vercel Blob token; if unset, files store as base64 in DB (~3.5MB limit) |
 
 Do **not** invent or commit real secret values. Copy from Turso / BotFather / Vercel Blob UI.
 
-Root `.env.example` lists the same keys for local use.
+Root `.env.example` lists the same keys for local Mini App/API. The **running Telegram bot** uses a separate file: `bot/.env`.
+
+### Fix: Mini App «Telegramga saqlash» → `BOT_TOKEN not configured`
+
+That error comes from the **Vercel API**, not from the local `npm start` bot.
+
+1. [BotFather](https://t.me/BotFather) → your bot → **API Token** (same token you put in `bot/.env`)
+2. Vercel → Project (`alcana-xodimlar`) → **Settings → Environment Variables**
+3. Add / edit `BOT_TOKEN` = that token (Environment: **Production**, also Preview if you use it)
+4. **Deployments → … → Redeploy** (env changes apply only after redeploy)
+5. Check: open `https://alcana-xodimlar.vercel.app/api/health` → `authModes.telegramInitData` should be `true`
+6. Telegramda Mini Appni qayta oching → «Telegramga saqlash» ni qayta sinab ko‘ring
 
 ### Admin Telegram IDs (bot)
 
@@ -103,29 +114,79 @@ API smoke test (server must be running):
 npm run test:api
 ```
 
-## Botni ishga tushirish
+## Botni ishga tushirish (long polling)
+
+Bot **webhook emas** — kompyuterda `npm start` bilan **long polling** (`getUpdates`) ishlaydi. Git pull dan keyin **eski `node` jarayonini toʻxtatib** qayta ishga tushiring; aks holda buyruqlar javobsiz qoladi yoki `409 Conflict` chiqadi.
+
+### Windows (PowerShell yoki CMD) — aniq qadamlar
+
+1. **Node.js 18+** oʻrnatilganligini tekshiring: `node -v`
+2. Reponi yangilang:
+   ```bat
+   cd C:\path\to\alcana-xodimlar
+   git pull origin main
+   ```
+3. Bot papkasiga kiring va paketlar:
+   ```bat
+   cd bot
+   npm install
+   ```
+4. `.env` yarating (birinchi marta):
+   ```bat
+   copy .env.example .env
+   notepad .env
+   ```
+5. `bot/.env` ni toʻldiring (haqiqiy qiymatlar; placeholder emas):
+
+```env
+BOT_TOKEN=BotFather_API_token
+WEBAPP_URL=https://alcana-xodimlar.vercel.app
+API_BASE_URL=https://alcana-xodimlar.vercel.app
+ADMIN_TELEGRAM_IDS=
+ADMIN_API_TOKEN=
+```
+
+6. Botni ishga tushiring (**shu oynani ochiq qoldiring**):
+   ```bat
+   npm start
+   ```
+   Konsolda koʻrinishi kerak:
+   - `✅ Alcana Xodimlar bot ishga tushdi (long polling)`
+   - `Admins (ADMIN_TELEGRAM_IDS): …` yoki `(none — /admin blocked)`
+
+7. Telegramda `@alcanastaffdata_bot` ga yozing va tekshiring:
+   - `/start` → salom + Mini App tugma
+   - `/help` → ochiq buyruqlar
+   - `/whoami` → sizning user ID (raqam)
+   - `/app` → Mini App tugma
+
+8. Admin qilish:
+   - `/whoami` dagi ID ni `ADMIN_TELEGRAM_IDS=` ga yozing (bir nechta: `111,222`)
+   - Terminalda `Ctrl+C` → yana `npm start`
+   - `/admin` endi ishlashi kerak; boshqalar aniq «faqat adminlar» xabarini oladi
+
+9. Merge / `git pull` dan keyin **har doim**:
+   ```bat
+   cd bot
+   git pull origin main
+   npm install
+   npm start
+   ```
+   Ikkinchi `npm start` ochmang — bir token = bitta jarayon.
+
+### macOS / Linux
 
 ```bash
 cd bot
 npm install
-cp .env.example .env
-```
-
-`bot/.env`:
-
-```env
-BOT_TOKEN=sizning_haqiqiy_bot_tokeningiz
-WEBAPP_URL=https://alcana-xodimlar.vercel.app
-API_BASE_URL=https://alcana-xodimlar.vercel.app
-ADMIN_TELEGRAM_IDS=123456789,987654321
-ADMIN_API_TOKEN=
-```
-
-```bash
+cp -n .env.example .env   # birinchi marta
+# bot/.env ni tahrirlang
 npm start
 ```
 
-Production da `WEBAPP_URL` / `API_BASE_URL` ni Vercel URL bilan bir xil qoldiring. `ADMIN_API_TOKEN` Vercel dagi bilan bir xil boʻlsin (bot yozuvlari uchun).
+Production da `WEBAPP_URL` / `API_BASE_URL` = Vercel URL. `ADMIN_API_TOKEN` Vercel dagi bilan bir xil (bot `/add` `/delete` uchun).
+
+**Ikki joy:** `bot/.env` → lokal buyruqlar; Vercel `BOT_TOKEN` → Mini App «Telegramga saqlash». Ikkalasi ham bir xil BotFather token.
 
 ### Bot buyruqlari
 
@@ -141,6 +202,8 @@ Production da `WEBAPP_URL` / `API_BASE_URL` ni Vercel URL bilan bir xil qoldirin
 | `/add <Ism Familiya>` | admin | Yangi xodim |
 | `/delete <ism>` | admin | Xodim oʻchirish |
 | `/photo` / `/upload` | admin | Foto/hujjat → Mini App |
+
+`ADMIN_TELEGRAM_IDS` boʻsh boʻlsa ham `/start` `/help` `/app` `/whoami` ishlaydi; faqat admin buyruqlar rad etiladi.
 
 ## BotFather
 
@@ -172,9 +235,10 @@ Telegramda `/start` → **Alcana Xodimlar** tugmasi.
 ## Redeploy checklist (foydalanuvchi uchun)
 
 1. Turso URL + token ni Vercel Environment Variables ga qoʻying
-2. `BOT_TOKEN` (va ixtiyoriy `ADMIN_API_TOKEN`) ni qoʻying — «Telegramga saqlash» uchun `BOT_TOKEN` majburiy
-3. Vercel da **Redeploy**
-4. `/api/health` ni tekshiring
-5. Bot `WEBAPP_URL` = `https://alcana-xodimlar.vercel.app`
-6. Bot `.env`: `ADMIN_TELEGRAM_IDS` ( `/whoami` dan) + `ADMIN_API_TOKEN` → bot restart
-7. Telegramda Mini App oching — status **Backend ulangan**; admin `/admin` ni sinab koʻring
+2. **Vercel** da `BOT_TOKEN` = BotFather token (`@alcanastaffdata_bot`) — «Telegramga saqlash» uchun majburiy (`bot/.env` yetarli emas)
+3. Ixtiyoriy: Vercel `ADMIN_API_TOKEN`
+4. Vercel da **Redeploy**
+5. `https://alcana-xodimlar.vercel.app/api/health` — `ok: true`, `authModes.telegramInitData: true`
+6. Lokal: `git pull` → `cd bot` → `bot/.env` (`BOT_TOKEN`, `ADMIN_TELEGRAM_IDS` from `/whoami`, `ADMIN_API_TOKEN`) → **eski botni toʻxtatib** `npm start`
+7. Telegram: `/start` `/help` `/whoami` `/app` ishlashini tekshiring; admin boʻlsangiz `/admin`
+8. Mini App — status **Backend ulangan**; «Telegramga saqlash» ni sinab koʻring

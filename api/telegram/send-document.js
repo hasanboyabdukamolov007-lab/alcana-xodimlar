@@ -19,7 +19,11 @@ module.exports = async function handler(req, res) {
     const { botToken } = authMode();
     if (!botToken) {
       return sendJson(res, 503, {
-        error: 'BOT_TOKEN not configured — cannot send to Telegram',
+        error:
+          'BOT_TOKEN not configured on Vercel — cannot send to Telegram. ' +
+          'Set BOT_TOKEN (same BotFather token as @alcanastaffdata_bot) in ' +
+          'Vercel → Project Settings → Environment Variables (Production), then Redeploy. ' +
+          'bot/.env alone is not enough for Mini App «Telegramga saqlash».',
         code: 'NO_BOT_TOKEN',
       });
     }

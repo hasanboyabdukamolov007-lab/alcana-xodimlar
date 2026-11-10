@@ -40,8 +40,11 @@ Olib tashlangan: Sudlanmaganligi haqida ma'lumotnoma (`no_criminal`).
 
 1. Lokal: `npm install && npm run dev` — `http://127.0.0.1:8080`
 2. API yo‘q bo‘lsa brauzerda demo ma’lumot ko‘rinadi (“Demo rejim”)
-3. Production: Vercel + `TURSO_*` env — UI “Backend ulangan” ko‘rsatadi
+3. Production: Vercel + `TURSO_*` + **`BOT_TOKEN`** (BotFather, «Telegramga saqlash» uchun) — Redeploy
 4. Telegram: BotFather Menu Button → `https://alcana-xodimlar.vercel.app`
+5. Lokal bot buyruqlari: `cd bot` → `bot/.env` (`BOT_TOKEN`, `ADMIN_TELEGRAM_IDS`) → `npm start`
+
+Agar Mini App da `BOT_TOKEN not configured` ko‘rinsa — token faqat `bot/.env` da, Vercel da emas. Vercel Environment Variables ga qo‘ying va Redeploy qiling.
 
 To‘liq deploy / env yo‘riqnomasi: [README.md](./README.md).
 
